@@ -22,6 +22,20 @@
     };
   }
 
+  if(typeof renderNotesEditor === 'function'){
+    const baseRenderNotesEditor = renderNotesEditor;
+    renderNotesEditor = function(sessionId){
+      return baseRenderNotesEditor(sessionId).replace(/Sobre este atendimento/g,'Notas do atendimento');
+    };
+  }
+
+  if(typeof renderSessionMenu === 'function'){
+    const baseRenderSessionMenu = renderSessionMenu;
+    renderSessionMenu = function(){
+      return baseRenderSessionMenu().replace(/Sobre este atendimento/g,'Notas do atendimento');
+    };
+  }
+
   if(typeof clientNotesDisclosureDemo === 'function'){
     clientNotesDisclosureDemo = function(s){
       if(!isClientArea(sessionAreaId(s))) return '';
