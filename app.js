@@ -406,7 +406,7 @@ async function undo(){
 
 'use strict';
 
-const DB_NAME='cronometro_public_demo_v1';
+const DB_NAME='cronometro_public_demo_v4';
 const DB_VERSION=1;
 const FACTORY_SEED_STATE_KEY='factorySeedVersion';
 
@@ -508,6 +508,65 @@ function materializeDemoSession(spec,models,clients,baseNow){
   };
 }
 
+
+function materializeDemoCurrent(spec,models,clients,baseNow){
+  if(!spec||typeof spec!=='object')return null;
+  const model=models.find(m=>m.id===spec.modelId)||models[0];
+  const client=clients.find(c=>c.id===spec.clientId)||null;
+  if(!model)return null;
+  const durations=Array.isArray(spec.durationsSec)?spec.durationsSec:[];
+  const openedAt=baseNow-45*60000;
+  let cursor=openedAt+2*60000;
+  const timers=model.timers.filter(t=>!t.removedAt).sort((a,b)=>a.order-b.order).map((template,index)=>{
+    const duration=Math.max(0,Number(durations[index])||0)*1000;
+    const startedAt=cursor;
+    const endedAt=startedAt+duration;
+    if(duration>0)cursor=endedAt+25000;
+    return {
+      id:`demo-current-timer-${index+1}`,
+      templateId:template.id,
+      name:template.name,
+      order:template.order,
+      isAdhoc:false,
+      isRemoved:false,
+      intervals:duration>0?[{id:`demo-current-interval-${index+1}`,startedAt,endedAt,origin:'demo-current'}]:[],
+      ignoredIntervals:[],
+      correctedDurationMs:null,
+      measurementStatus:duration>0?'measured':'notNeeded',
+      marker:clone(template.marker||null)
+    };
+  });
+  const first=timers.find(t=>t.intervals.length)?.intervals[0]?.startedAt||openedAt;
+  const pauseStartedAt=Math.min(baseNow-60000,Math.max(first,cursor));
+  return {
+    id:'demo-current-session',
+    modelId:model.id,
+    modelNameSnapshot:model.name,
+    areaId:model.areaId||'atendimentos',
+    title:client?.name||'',
+    manualTitle:false,
+    note:String(spec.appointmentNote||''),
+    appointmentNote:String(spec.appointmentNote||''),
+    clientNote:String(spec.clientNote||''),
+    clientId:client?.id||null,
+    clientNameSnapshot:client?.name||'',
+    openedAt,
+    firstTimerStartedAt:first,
+    savedAt:null,
+    originalRecordedAt:null,
+    restoredAt:null,
+    deletedAt:null,
+    status:'active',
+    isNoMeasurement:false,
+    globalPaused:false,
+    pauseIntervals:[{id:'demo-current-pause',startedAt:pauseStartedAt,endedAt:null,origin:'demo-current'}],
+    pausedActiveTimerIds:[],
+    customized:false,
+    timers,
+    clientMode:true
+  };
+}
+
 async function seedFactoryDataIfNeeded(){
   const marker=await getState(FACTORY_SEED_STATE_KEY);
   if(marker!=null)return;
@@ -533,7 +592,9 @@ async function seedFactoryDataIfNeeded(){
   const settingsPayload=payload.settings&&typeof payload.settings==='object'?clone(payload.settings):null;
   const clients=Array.isArray(settingsPayload?.clients)?settingsPayload.clients:[];
   const demoSpecs=Array.isArray(payload.demo?.sessions)?payload.demo.sessions:[];
-  const demoSessions=payload.demo?.enabled?demoSpecs.map(spec=>materializeDemoSession(spec,modelsPayload,clients,Date.now())).filter(Boolean):[];
+  const demoBaseNow=Date.now();
+  const demoSessions=payload.demo?.enabled?demoSpecs.map(spec=>materializeDemoSession(spec,modelsPayload,clients,demoBaseNow)).filter(Boolean):[];
+  const demoCurrent=payload.demo?.enabled&&payload.demo?.current?materializeDemoCurrent(payload.demo.current,modelsPayload,clients,demoBaseNow):null;
   if(settingsPayload&&Number.isFinite(Number(payload.demo?.lastBackupDaysAgo))){
     settingsPayload.lastBackupExportAt=Date.now()-Math.max(0,Number(payload.demo.lastBackupDaysAgo))*86400000;
   }
@@ -547,6 +608,7 @@ async function seedFactoryDataIfNeeded(){
     modelsPayload.forEach(model=>models.put(model));
     demoSessions.forEach(session=>sessions.put(session));
     if(settingsPayload)state.put({key:'settings',value:settingsPayload});
+    if(demoCurrent)state.put({key:'current',value:demoCurrent});
     state.put({key:FACTORY_SEED_STATE_KEY,value:Number(payload.factoryDataVersion)||APP_META.factoryDataVersion});
 
     tr.oncomplete=resolve;
@@ -2191,12 +2253,7 @@ async function init(){
 
   await purgeExpired();
   render();
-  try{
-    if(!sessionStorage.getItem('cronometro_public_demo_notice')){
-      sessionStorage.setItem('cronometro_public_demo_notice','1');
-      setTimeout(()=>toast('Demonstração: clientes e registros fictícios já estão carregados'),450);
-    }
-  }catch(_){}
+  /* O aviso de demonstração é exibido pela camada pública persistente. */
 
   tickHandle=setInterval(()=>{
     if(ui.tab==='timers'&&ui.timerView==='timers'&&data.current&&data.current.timers.some(isTimerActive))refreshTimerReadouts();
@@ -3312,3 +3369,313 @@ render=function(){
   };
 })();
 ;
+
+'use strict';
+/* ============================================================
+   Camada de apresentação da demonstração pública — set/2026
+   Ajustes de UX para portfólio sem alterar o núcleo de dados.
+   ============================================================ */
+
+function speakerIconDemo(){
+  return `<svg class="sf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10v4h3l4 3V7L8 10H5Z"/><path d="M15 9.5c1.2 1.5 1.2 3.5 0 5"/><path d="M17.6 7c2.5 2.8 2.5 7.2 0 10"/></svg>`;
+}
+function clockIconDemo(){ return svgIcon('clock'); }
+
+/* Ícone solicitado para Apagados / Excluir. */
+trashIconMarkup=function(){
+  return `<svg class="trash-icon-requested" viewBox="0 0 19.7734 24.0234" width="24" height="24" aria-hidden="true"><g><rect height="24.0234" opacity="0" width="19.7734" x="0" y="0"/><path d="M6.67969 19.1484C7.01562 19.1484 7.23438 18.9297 7.22656 18.625L6.90625 7.60156C6.89844 7.29688 6.67188 7.09375 6.35938 7.09375C6.02344 7.09375 5.80469 7.30469 5.8125 7.61719L6.13281 18.625C6.14062 18.9375 6.35938 19.1484 6.67969 19.1484ZM9.6875 19.1484C10.0156 19.1484 10.25 18.9297 10.25 18.625L10.25 7.61719C10.25 7.30469 10.0156 7.09375 9.6875 7.09375C9.35938 7.09375 9.125 7.30469 9.125 7.61719L9.125 18.625C9.125 18.9297 9.35938 19.1484 9.6875 19.1484ZM12.6875 19.1484C13.0078 19.1484 13.2266 18.9453 13.2344 18.6328L13.5547 7.61719C13.5625 7.30469 13.3438 7.10156 13.0156 7.10156C12.7031 7.10156 12.4766 7.29688 12.4688 7.60938L12.1484 18.625C12.1406 18.9297 12.3516 19.1484 12.6875 19.1484ZM5.33594 4.46875L6.70312 4.46875L6.70312 2.32031C6.70312 1.69531 7.13281 1.28906 7.80469 1.28906L11.5469 1.28906C12.2188 1.28906 12.6484 1.69531 12.6484 2.32031L12.6484 4.46875L14.0156 4.46875L14.0156 2.24219C14.0156 0.851562 13.1172 0 11.625 0L7.72656 0C6.24219 0 5.33594 0.851562 5.33594 2.24219ZM0.648438 5.14844L18.7188 5.14844C19.0781 5.14844 19.3672 4.85156 19.3672 4.5C19.3672 4.14062 19.0781 3.84375 18.7188 3.84375L0.648438 3.84375C0.304688 3.84375 0 4.14844 0 4.5C0 4.85938 0.304688 5.14844 0.648438 5.14844ZM5.10156 22.3125L14.2812 22.3125C15.625 22.3125 16.5703 21.3984 16.6406 20.0547L17.3828 4.96875L15.9844 4.96875L15.2812 19.9141C15.25 20.5469 14.7734 21.0078 14.1484 21.0078L5.21094 21.0078C4.60156 21.0078 4.11719 20.5391 4.08594 19.9141L3.34375 4.97656L1.99219 4.97656L2.73438 20.0625C2.80469 21.4062 3.73438 22.3125 5.10156 22.3125Z" fill="currentColor" fill-opacity="0.85"/></g></svg>`;
+};
+
+/* Rótulos padrão / Área ativa. */
+clientLabelForSession=function(s){
+  if(!s)return data.settings.clientEmptyLabel||'selecionar cliente';
+  return clientById(s.clientId)?.name||s.clientNameSnapshot||data.settings.clientEmptyLabel||'selecionar cliente';
+};
+activeAreaBadge=function(area=activeArea()){
+  return `<span class="area-profile-badge" title="Área ativa">Área ativa: ${esc(area?.name||'Sem área')}</span>`;
+};
+
+/* Tela inicial da demonstração. */
+renderTimers=function(){
+  const models=activeModels(),s=data.current;
+  if(!models.length)return shell(`<header class="topbar simple demo-main-header"><div class="section-profile-head">${activeAreaBadge()}<h1>Cronômetro</h1></div></header><main class="content"><div class="empty">Nenhum modelo criado.<br><br><button class="ios-button" id="createFirst">Criar modelo em ${esc(activeArea().name)}</button></div></main>`);
+  if(!s)return shell(`<header class="topbar simple demo-main-header"><div class="section-profile-head">${activeAreaBadge()}<h1>Cronômetro</h1></div></header><main class="content"><div class="empty">Escolha um modelo para começar.<br><br><button class="ios-button" id="modelsBack">Ver modelos</button></div></main>${ui.timerView==='models'?renderModelsDrawer():''}`);
+  const model=modelById(s.modelId),timerMode=currentTimerMode(),central=timerMode.layout==='central';
+  const cards=s.timers.sort((a,b)=>a.order-b.order).map(rt=>`<button class="timer-card ${central?'central':''} ${timerStateClass(s,rt)}" data-timer="${rt.id}" aria-label="${esc(rt.name)}, ${fmtDuration(timerDuration(rt))}">${timerStateIcon(s,rt)}<span class="timer-name-wrap">${visualMarkerMarkup(rt.marker)}<span class="name ${timerNameFit(rt.name)}">${esc(rt.name)}${rt.isAdhoc?'<span class="badge">Etapa avulsa</span>':''}</span></span><span class="time">${fmtDuration(timerDuration(rt))}</span></button>`).join('');
+  const running=s.timers.some(isTimerActive),blink=running&&data.settings.blinkTotalColon,totalText=fmtDuration(sessionTotal(s)),widthClass=totalText.length>=9?'total-xlong':totalText.length>=7?'total-hours':'';
+  const clientMode=isClientArea(sessionAreaId(s)),display=clientMode?clientLabelForSession(s):currentTitle(),longClient=clientMode&&String(display).length>21;
+  const titlePopover=!clientMode&&ui.popover?.type==='title'?`<div class="popover-backdrop" id="closePopover"></div><div class="title-popover floating-window"><button id="titleRename">Renomear</button><button id="titleEditModel">Editar modelo</button><button id="titleDiscard" class="danger">Descartar</button></div>`:'';
+  const modelsDrawer=ui.timerView==='models'?renderModelsDrawer():'';
+  const paused=!!openPause(s)&&!running;
+  return shell(`<header class="topbar timer-topbar demo-main-header">${activeAreaBadge(areaById(sessionAreaId(s)))}<div class="header-row"><button class="circle-button" id="modelsBack" aria-label="Modelos">${svgIcon('back')}</button><button class="current-title ${clientMode&&!s.clientId?'untitled':''} ${longClient?'client-long':''}" id="currentTitleButton">${esc(display)}</button><button class="circle-button" id="sessionMenu" aria-label="Detalhes">${svgIcon('more')}</button>${titlePopover}</div><div class="model-selected-block"><span class="model-selected-kicker">modelo selecionado</span><div class="current-model-name">${esc(model?.name||s.modelNameSnapshot)}</div></div>${paused?'<div class="status-line demo-pause-status">Atendimento em pausa</div>':s.customized?'<div class="status-line">Personalizado neste registro</div>':''}</header><main class="content timer-content"><div class="timer-list">${cards}<button class="add-card" id="addAdhoc">${svgIcon('plus')}<span>Adicionar cronômetro</span></button></div></main><div class="floating-actions timer-actions ${widthClass}"><section class="total-card floating-card ${running?'running':''}"><span class="total-icon">${svgIcon('clock')}</span><span class="total-copy"><small>Tempo total</small><strong class="total-time">${fmtDurationWithBlinkingColons(sessionTotal(s),blink)}</strong></span></section><button class="save-btn" id="saveBtn">${svgIcon('check')}<span>Salvar</span></button></div>${modelsDrawer}`);
+};
+
+/* Áreas e modelos. */
+renderModelsDrawer=function(){
+  const areas=getAreas().slice().sort((a,b)=>a.id==='general'?1:b.id==='general'?-1:a.name.localeCompare(b.name,'pt-BR')),active=activeAreaId();
+  const groups=areas.map(a=>{
+    const ms=activeModels().filter(m=>modelAreaId(m)===a.id).sort((x,y)=>(x.sortOrder??0)-(y.sortOrder??0));
+    const rows=ms.map(m=>`<div class="model-row ${data.current?.modelId===m.id?'current':''}"><button class="model-main" data-choose-model="${m.id}"><span>${esc(m.name)}</span></button>${ui.modelsEditing?`<button class="model-more" data-model-options="${m.id}" aria-label="Opções">${svgIcon('more')}</button>`:''}</div>`).join('');
+    return `<section class="models-area-group ${a.id===active?'active':'inactive'}"><button class="models-area-heading ${a.id===active?'active':''}" data-activate-area="${a.id}"><span class="models-area-name">${esc(a.name)} <span class="area-type-pill">${esc(areaTypeLabel(a.type))}</span></span><span class="models-count">${ms.length} modelos</span></button>${rows||'<div class="models-area-empty">Nenhum modelo nesta área.</div>'}</section>`;
+  }).join('');
+  return `<div class="models-drawer-backdrop" id="modelsDrawerBackdrop"><aside class="models-drawer"><div class="models-drawer-head"><button id="toggleModelsEdit">${ui.modelsEditing?'Concluir':'Editar'}</button><div><strong>Áreas e modelos</strong>${activeAreaBadge()}</div><button class="circle-button" id="closeModelsDrawer">${svgIcon('close')}</button></div><main class="models-page"><button class="create-model-card" id="createModel">${svgIcon('plus')}<span>Criar modelo em ${esc(activeArea().name)}</span></button>${groups}</main></aside></div>`;
+};
+
+/* Histórico sem repetir a data dentro de cada cartão. */
+renderHistory=function(){
+  const aid=activeAreaId(),sessions=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&sessionAreaId(s)===aid).sort((a,b)=>recordDateMs(b)-recordDateMs(a));
+  const filtered=sessions.filter(s=>historyMatchesQuery(s,ui.historyQuery)&&(ui.historyModel==='all'||s.modelId===ui.historyModel)&&(!ui.historyDate||dayKey(recordDateMs(s))===ui.historyDate));
+  const groups={};filtered.forEach(s=>{const k=dayKey(recordDateMs(s));(groups[k]??=[]).push(s);});
+  const list=Object.entries(groups).map(([k,arr])=>`<div class="history-day">${fmtDate(new Date(k+'T12:00:00').getTime())}</div>${arr.map(s=>{const clientMode=isClientArea(sessionAreaId(s)),title=sessionDisplayTitle(s);return `<button class="history-card" data-session="${s.id}"><div class="top"><strong class="${clientMode?'history-card-client-name':''}">${clientMode?personIconMarkup():''}${esc(title)}</strong>${s.isNoMeasurement?'':`<span class="history-total">${svgIcon('timers')}<span>${fmtDuration(sessionTotal(s,s.savedAt))}</span></span>`}</div><div class="history-meta">${esc(s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo')}</div>${s.isNoMeasurement?'<span class="badge">Sem medição</span>':''}${s.restoredAt?'<span class="badge">Restaurado</span>':''}</button>`;}).join('')}`).join('');
+  const modelOptions=modelOptionsForActiveArea(),searchPlaceholder=isClientArea()?'Buscar cliente ou registro':'Buscar título ou registro';
+  return shell(`<header class="topbar simple section-tab-header history-header demo-tab-header"><span></span><div class="section-profile-head">${activeAreaBadge()}<h1>Registros</h1></div><button class="header-pill history-trash-button" id="historyTrash">${trashIconMarkup()}<span>Apagados</span></button></header><main class="content history-content"><div class="filters history-filters history-filters-v082"><div class="history-search-wrap"><input id="historySearch" placeholder="${esc(searchPlaceholder)}" value="${esc(ui.historyQuery)}" autocomplete="off">${historyClientSuggestionsMarkup()}</div><select id="historyModel"><option value="all">Todos os modelos desta área</option>${modelOptions.map(m=>`<option value="${m.id}" ${ui.historyModel===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select><div class="date-filter date-filter-v082 ${ui.historyDate?'has-value':''}"><span class="date-placeholder">Filtrar por data</span><input id="historyDate" type="date" value="${esc(ui.historyDate)}">${ui.historyDate?`<button id="historyDateClear" aria-label="Limpar data">${svgIcon('close')}</button>`:''}</div></div>${list||'<div class="empty">Nenhum registro encontrado nesta área.</div>'}</main>`);
+};
+
+function clientNotesDisclosureDemo(s){
+  if(!isClientArea(sessionAreaId(s)))return '';
+  const clientText=String(s.clientNote||'').trim();
+  return `${clientText?`<details class="client-info-disclosure"><summary>informações coletadas sobre a cliente nesse atendimento</summary><div class="client-info-tongue">${esc(clientText)}</div></details>`:''}${s.clientId?`<button class="client-more-button" data-open-client="${s.clientId}">Ver mais sobre essa cliente</button>`:''}`;
+}
+
+/* Detalhe de registro reorganizado. */
+renderSessionDetail=function(s){
+  const model=modelById(s.modelId),timers=[...(s.timers||[])].sort((a,b)=>(a.order??0)-(b.order??0)),gross=recordGrossMs(s),working=sessionTotal(s,s.savedAt),pauses=pauseTotal(s,s.savedAt),clientMode=isClientArea(sessionAreaId(s)),heading=clientMode?clientLabelForSession(s):s.title;
+  const appointment=String(s.appointmentNote||s.note||'').trim();
+  return `<div class="modal-wrap record-detail-wrap"><section class="sheet record-detail-sheet"><div class="sheet-head record-detail-head demo-record-head"><button class="circle-button glass record-detail-close" id="closeModal" aria-label="Fechar">${svgIcon('close')}</button><h2 class="record-detail-heading">Detalhes do registro</h2><button class="record-detail-check" id="closeRecordDetail" aria-label="Concluir">${svgIcon('check')}</button></div><div class="record-detail-body"><button class="record-client-heading ${clientMode?'':'generic'}" ${clientMode?`data-edit-record-client="${s.id}"`:`data-edit-session-title="${s.id}"`}><span>${esc(heading)}</span>${svgIcon('pencil')}</button><button class="record-date-button demo-record-date" data-edit-record-date="${s.id}">${esc(fmtDateTime(recordDateMs(s)))} ${svgIcon('pencil')}</button>${appointment?`<section class="record-note-section"><h3 class="record-section-label">Sobre este atendimento</h3><div class="saved-note-card demo-appointment-note">${esc(appointment)}</div><button class="edit-notes-button" data-edit-dual-notes="${s.id}">Editar anotações</button></section>`:`<button class="edit-notes-button demo-add-note" data-edit-dual-notes="${s.id}">Adicionar anotações</button>`}${clientNotesDisclosureDemo(s)}<div class="record-detail-divider"></div><section class="panel record-summary demo-record-summary"><div class="record-model-block"><span class="record-low-label">Modelo</span><strong class="record-model-name">${esc(model?(model.deletedAt?'Modelo excluído':model.name):'Modelo excluído')}</strong><span class="record-area-line">Área: ${esc(areaById(sessionAreaId(s)).name.toLocaleLowerCase())}</span></div>${s.isNoMeasurement?'<div class="row"><span class="badge">Sem medição</span></div>':`<div class="record-time-grid"><div><span>Tempo total</span><strong>${fmtDuration(working)}</strong></div><div><span>Tempo decorrido</span><strong>${fmtDuration(gross)}</strong></div><div><span>Pausas</span><strong>${fmtDuration(pauses)}</strong></div></div>`}</section>${!model?`<div class="record-actions"><button data-rebuild-model="${s.id}">Criar modelo deste registro</button></div>`:''}<div class="record-timers-list demo-record-timers">${timers.map(t=>{const d=timerDuration(t,s.savedAt),zero=d<=0,status=zeroMeasurementStatus(t),ignored=t.ignoredIntervals||[];return `<details class="record-timer-card ${zero?'zero':''}"><summary><span class="record-timer-title">${visualMarkerMarkup(t.marker,'record-inline-marker')}${esc(t.name)}${zero&&status==='missing'?'<span class="measurement-missing-badge">Sem medição</span>':''}</span><span class="record-timer-time">${svgIcon('timers')}<strong>${fmtDuration(d)}</strong></span></summary><div class="record-timer-extra">${zero?`<div class="measurement-status-box"><div class="measurement-status-title">Como tratar este zero nas estatísticas?</div><div class="measurement-status-options"><button data-measurement-status="notNeeded" data-session-id="${s.id}" data-timer-id="${t.id}" class="${status==='notNeeded'?'selected':''}">Não foi necessário</button><button data-measurement-status="missing" data-session-id="${s.id}" data-timer-id="${t.id}" class="${status==='missing'?'selected':''}">Sem medição</button></div></div>`:''}${ignored.length?`<div class="ignored-short-note">${ignored.length} toque(s) curto(s) ignorado(s)</div>`:''}<div class="muted small record-interval-label">Horários e intervalos</div>${t.intervals?.length?t.intervals.map(i=>`<div class="row small"><span>${fmtDateTime(i.startedAt)}</span><span>${i.endedAt?fmtDateTime(i.endedAt):'aberto'}</span></div>`).join(''):'<div class="muted small">Nenhum intervalo registrado.</div>'}<button class="action" data-correct-time="${s.id}" data-timer-id="${t.id}">Corrigir tempo</button></div></details>`;}).join('')}</div><div class="record-delete-wrap"><button class="record-delete-button" data-delete-session="${s.id}">${trashIconMarkup()}<span>Excluir registro</span></button><div class="record-delete-help">esse atendimento/registro será movido para “apagados”</div></div></div></section></div>`;
+};
+
+/* Estatísticas: Evolução primeiro e aberta. */
+function statsSectionDemo(title,body,open=false){return `<details class="panel stats-collapsible" ${open?'open':''}><summary>${esc(title)}</summary><div class="stats-collapsible-body">${body}</div></details>`;}
+renderStats=function(){
+  const aid=activeAreaId(),ss=validMeasuredSessions().filter(s=>sessionAreaId(s)===aid),count=ss.length,total=ss.reduce((a,s)=>a+sessionTotal(s,s.savedAt),0),avg=count?total/count:0,timers=statsTimerData(ss);let trend='Sem dados suficientes';
+  if(ss.length>=2){const ordered=[...ss].sort((a,b)=>recordDateMs(a)-recordDateMs(b)),half=Math.max(1,Math.floor(ordered.length/2)),a=ordered.slice(0,half).reduce((x,s)=>x+sessionTotal(s,s.savedAt),0)/half,bArr=ordered.slice(-half),b=bArr.reduce((x,s)=>x+sessionTotal(s,s.savedAt),0)/bArr.length,pct=a?((b-a)/a*100):0;trend=pct<0?`${Math.abs(pct).toFixed(1).replace('.',',')}% mais rápido`:`${pct.toFixed(1).replace('.',',')}% mais lento`;}
+  const metricRows=timers.map(x=>{const necessary=x.necessary.length?x.necessary.reduce((a,b)=>a+b,0)/x.necessary.length:null,impact=x.impact.length?x.impact.reduce((a,b)=>a+b,0)/x.impact.length:null,pct=x.seen?x.notNeeded/x.seen*100:0;return `<div class="timer-metric-row"><div class="metric-main"><span>${esc(x.name)}</span><strong>${necessary==null?'—':fmtDuration(necessary)}</strong></div><small>Média quando necessário · impacto médio ${impact==null?'—':fmtDuration(impact)} · não foi necessário ${pct.toFixed(0)}%${x.missing?` · ${x.missing} sem medição`:''}</small></div>`;}).join('')||'<div class="muted">Sem dados.</div>';
+  const clientSection=isClientArea(aid)?(()=>{const clients=new Map();ss.forEach(s=>{if(!s.clientId)return;const x=clients.get(s.clientId)||{name:clientLabelForSession(s),count:0,total:0};x.count++;x.total+=sessionTotal(s,s.savedAt);clients.set(s.clientId,x);});return statsSectionDemo('Clientes',[...clients.entries()].sort((a,b)=>b[1].count-a[1].count).map(([id,x])=>`<div class="row"><button class="client-record-open" data-open-client="${id}">${esc(x.name)}</button><strong>${x.count} · média ${fmtDuration(x.total/x.count)}</strong></div>`).join('')||'<div class="muted">Nenhuma cliente vinculada.</div>');})():'';
+  const sections=count?[statsSectionDemo('Evolução / tendência',`<div class="stat-big">${esc(trend)}</div><p class="muted small">Comparação da média da primeira metade dos registros com a metade mais recente.</p>`,true),statsSectionDemo('Resumo',`<div class="row"><span>Registros medidos</span><strong>${count}</strong></div><div class="row"><span>Tempo acumulado</span><strong>${fmtDuration(total)}</strong></div><div class="row"><span>Média por registro</span><strong>${fmtDuration(avg)}</strong></div>`),clientSection,statsSectionDemo('Cronômetros — médias e frequência',metricRows),statsSectionDemo('Tempo total por registro',[...ss].sort((a,b)=>recordDateMs(b)-recordDateMs(a)).slice(0,12).map(s=>`<div class="row"><span>${esc(sessionDisplayTitle(s))}</span><strong>${fmtDuration(sessionTotal(s,s.savedAt))}</strong></div>`).join(''))].filter(Boolean).join(''):'';
+  return shell(`<header class="topbar section-tab-header demo-tab-header"><div class="section-profile-head">${activeAreaBadge()}<h1>Estatísticas</h1></div></header><main class="content"><h2 class="section-title">Visão geral</h2>${count?`<div class="stats-grid">${sections}</div>`:`<div class="empty">As estatísticas aparecerão depois que você salvar registros com medição nesta área.</div>`}</main>`);
+};
+
+function clientDirectoryRowsDemo(){
+  const all=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const groups=new Map();
+  all.forEach(c=>{const letter=(c.name?.trim()?.[0]||'#').toLocaleUpperCase('pt-BR');if(!groups.has(letter))groups.set(letter,[]);groups.get(letter).push(c);});
+  return [...groups.entries()].map(([letter,clients])=>`<section class="client-letter-group"><h3>${esc(letter)}</h3><div class="client-directory-card">${clients.map(c=>{const count=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&s.clientId===c.id).length;return `<button class="client-directory-row" data-open-client="${c.id}"><span><strong>${esc(c.name)}</strong>${c.whatsapp?`<small>${esc(c.whatsapp)}</small>`:''}</span><span>${count} atend.</span></button>`;}).join('')}</div></section>`).join('')||'<div class="empty">Nenhuma cliente cadastrada.</div>';
+}
+function renderClientsDirectoryDemo(){
+  return shell(`<header class="topbar simple section-tab-header appearance-header demo-tab-header"><button class="appearance-back" id="closeClientsDirectory">${svgIcon('back')}</button><div class="section-profile-head">${activeAreaBadge()}<h1>Clientes cadastradas</h1></div><span></span></header><main class="settings-content clients-directory-screen">${clientDirectoryRowsDemo()}</main>`,'settings');
+}
+
+function themeModeCardDemo(){
+  const opts=[['light','Claro'],['system','Sistema'],['dark','Escuro']];
+  return `<section class="settings-section demo-theme-section"><div class="settings-card demo-theme-card"><h3>Tema</h3><div class="demo-theme-buttons">${opts.map(([id,label])=>`<button data-demo-theme="${id}" class="${data.settings.theme===id?'selected':''}">${label}</button>`).join('')}</div></div></section>`;
+}
+function areaSettingsDemo(){
+  const areas=getAreas();
+  return `<section class="settings-section"><h3 class="section-label">Áreas</h3><div class="settings-card demo-areas-card"><div class="demo-active-area"><span>Área ativa</span><strong>${esc(activeArea().name)}</strong></div>${areas.map(a=>`<div class="demo-area-row"><div class="demo-area-copy"><strong>${esc(a.name)}</strong><small>${esc(areaTypeLabel(a.type))}</small></div><div class="demo-area-actions"><button data-rename-area="${a.id}">Renomear</button><button data-change-area-type="${a.id}">Tipo</button>${a.id!=='general'?`<button class="danger" data-delete-area="${a.id}">Excluir</button>`:''}</div></div>`).join('')}<button class="demo-add-area" id="addArea">＋ Adicionar área</button></div></section>`;
+}
+
+const __renderSettingsBeforeDemo=renderSettings;
+renderSettings=function(){
+  ui.settingsView=ui.settingsView||'main';
+  if(ui.settingsView==='clients')return renderClientsDirectoryDemo();
+  if(ui.settingsView!=='main')return __renderSettingsBeforeDemo();
+  const soundStatus=data.settings.timerSoundEnabled?(data.settings.timerSoundData?'Ativado':'Sem áudio'):'Desativado';
+  return shell(`<header class="topbar simple section-tab-header demo-tab-header"><div class="section-profile-head">${activeAreaBadge()}<h1>Ajustes</h1></div></header><main class="settings-content demo-settings-main"><section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row demo-clients-entry" id="openClientsDirectory"><span>${personIconMarkup()}<strong>Clientes cadastradas</strong></span><span class="secondary-value">Ver lista ›</span></button></div></section>${themeModeCardDemo()}<section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openSoundSettings"><span class="settings-icon-label">${speakerIconDemo()}<span>Som do cronômetro</span></span><span class="secondary-value">${esc(soundStatus)} ›</span></button></div></section>${areaSettingsDemo()}<section class="settings-section"><h3 class="section-label">Personalização</h3><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openAppearanceSettings"><span>Aparência e personalização</span><span class="secondary-value">›</span></button></div></section>${renderDataBackupSectionV087()}<section class="settings-section"><div class="settings-card"><div class="settings-row"><span>Versão</span><span class="secondary-value">${esc(APP_META.version)}</span></div></div></section></main>`,'settings');
+};
+
+/* Move o texto sem cliente para Aparência / Personalização. */
+const __renderAppearanceBeforeDemo=renderAppearanceSettings;
+renderAppearanceSettings=function(){
+  let html=__renderAppearanceBeforeDemo();
+  const marker='<main class="settings-content">';
+  const block=`<section class="settings-section"><h3 class="section-label">Clientes</h3><div class="settings-card"><button class="settings-row button-row" id="editClientEmptyLabel"><span>Texto quando não houver cliente</span><span class="secondary-value">${esc(data.settings.clientEmptyLabel||'selecionar cliente')}</span></button></div></section>`;
+  if(html.includes(marker))html=html.replace(marker,marker+block);
+  return html;
+};
+
+function dedupeTextDemo(list){
+  const seen=new Set(),out=[];for(const raw of list){const text=String(raw||'').trim();const key=normalizeSearchText(text);if(!text||seen.has(key))continue;seen.add(key);out.push(text);}return out;
+}
+function renderClientProfile(clientId){
+  const c=clientById(clientId);if(!c)return '';
+  const ss=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&s.clientId===c.id).sort((a,b)=>recordDateMs(b)-recordDateMs(a)),measured=ss.filter(s=>!s.isNoMeasurement),avg=measured.length?measured.reduce((a,s)=>a+sessionTotal(s,s.savedAt),0)/measured.length:0;
+  const unifiedClientNotes=dedupeTextDemo(ss.map(s=>s.clientNote));
+  const attendanceNotes=ss.filter(s=>String(s.appointmentNote||s.note||'').trim());
+  return `<div class="client-profile-wrap"><section class="client-profile-card demo-client-profile"><div class="client-profile-head demo-client-head"><span></span><button class="demo-client-name" data-edit-client-name="${c.id}"><span>${esc(c.name)}</span>${svgIcon('pencil')}</button><button class="client-profile-close" id="closeClientProfile">${svgIcon('close')}</button></div><div class="client-contact-strip">${c.whatsapp?`<span><small>WhatsApp</small><strong>${esc(c.whatsapp)}</strong></span>`:'<span><small>WhatsApp</small><strong>Não informado</strong></span>'}</div><div class="client-count-row"><span>Atendimentos</span><strong>${ss.length}</strong></div><div class="client-average-card"><small>Tempo médio</small><strong>${clockIconDemo()}<span>${measured.length?fmtDuration(avg):'—'}</span></strong></div><button class="client-chart-button" data-open-client-chart="${c.id}">${svgIcon('stats')}<span>Gráfico de cronômetros</span></button><section class="client-profile-section unified-client-notes"><h3>Anotações sobre a cliente</h3><div class="unified-notes-card">${unifiedClientNotes.length?unifiedClientNotes.map(n=>`<p>${esc(n)}</p>`).join(''):'<p class="muted">Nenhuma anotação.</p>'}</div></section><section class="client-profile-section attendance-notes"><h3>Anotações dos atendimentos</h3>${attendanceNotes.length?attendanceNotes.map(s=>`<article class="client-note-entry"><div class="meta">${esc(fmtDate(recordDateMs(s)))} · ${esc(s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo')}</div><p>${esc(String(s.appointmentNote||s.note||''))}</p><button class="client-record-open" data-open-client-record="${s.id}">Ver atendimento completo</button></article>`).join(''):'<div class="muted small">Nenhuma anotação de atendimento.</div>'}</section></section></div>`;
+}
+
+function clientChartSvgDemo(clientId){
+  const c=clientById(clientId);if(!c)return '';
+  const ss=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&s.clientId===c.id).sort((a,b)=>recordDateMs(a)-recordDateMs(b));
+  if(!ss.length)return '<div class="empty">Ainda não há tempos medidos para esta cliente.</div>';
+  const vals=ss.map(s=>({ms:sessionTotal(s,s.savedAt),date:fmtDate(recordDateMs(s))}));
+  const W=340,H=190,padL=38,padR=14,padT=18,padB=34,innerW=W-padL-padR,innerH=H-padT-padB;
+  const max=Math.max(...vals.map(v=>v.ms),1),min=Math.min(...vals.map(v=>v.ms),0),range=Math.max(1,max-min);
+  const pts=vals.map((v,i)=>{const x=padL+(vals.length===1?innerW/2:i*innerW/(vals.length-1));const y=padT+innerH-(v.ms-min)/range*innerH;return {...v,x,y};});
+  const path=pts.map((p,i)=>`${i?'L':'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const guides=[0,.5,1].map(f=>{const y=padT+innerH*(1-f),value=min+range*f;return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" class="client-chart-grid"/><text x="${padL-6}" y="${y+4}" text-anchor="end" class="client-chart-axis">${esc(fmtShort(value))}</text>`;}).join('');
+  const dots=pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="4.2" class="client-chart-dot"><title>${p.date}: ${fmtDuration(p.ms)}</title></circle>${(i===0||i===pts.length-1||pts.length<=4)?`<text x="${p.x}" y="${H-10}" text-anchor="middle" class="client-chart-date">${esc(p.date.slice(0,5))}</text>`:''}`).join('');
+  return `<svg class="client-line-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Variação do tempo total entre atendimentos">${guides}<path d="${path}" class="client-chart-line" fill="none"/>${dots}</svg>`;
+}
+function renderClientChartDemo(clientId){
+  const c=clientById(clientId);if(!c)return '';
+  return `<div class="client-chart-wrap"><section class="client-chart-card"><div class="client-chart-head"><button id="closeClientChart">${svgIcon('back')}</button><div><small>${esc(c.name)}</small><h2>Gráfico de cronômetros</h2></div><span></span></div><p class="client-chart-subtitle">Variação do tempo total de cada atendimento, do mais antigo ao mais recente.</p>${clientChartSvgDemo(clientId)}</section></div>`;
+}
+
+/* Detalhes da tela inicial: folha menor, animada e com contorno. */
+const __renderSessionMenuDemoBase=renderSessionMenu;
+renderSessionMenu=function(){
+  const html=__renderSessionMenuDemoBase();
+  return html.replace('class="sheet details-sheet"','class="sheet details-sheet demo-details-sheet"');
+};
+
+let demoNoticeDismissed=false;
+function ensureDemoNotice(){
+  const old=document.getElementById('demoPresentationNotice');
+  if(demoNoticeDismissed){old?.remove();return;}
+  if(old)return;
+  const el=document.createElement('aside');el.id='demoPresentationNotice';el.className='demo-presentation-notice';
+  el.innerHTML=`<button id="closeDemoPresentationNotice" aria-label="Fechar">${svgIcon('close')}</button><strong>Versão de demonstração</strong><p>Clientes, contatos, registros e tempos exibidos aqui são fictícios e existem apenas para visualizar as funções. O aplicativo ainda está em fase de desenvolvimento.</p>`;
+  document.body.appendChild(el);
+  document.getElementById('closeDemoPresentationNotice')?.addEventListener('click',()=>{demoNoticeDismissed=true;el.remove();});
+}
+
+async function editClientNameDemo(clientId){
+  const c=clientById(clientId);if(!c)return;
+  const raw=await iosTextPrompt({title:'Editar cliente',value:c.name,placeholder:'Nome da cliente'}),name=String(raw??'').trim();if(!name)return;
+  c.name=name;c.updatedAt=now();
+  for(const s of data.sessions){if(s.clientId===c.id){s.clientNameSnapshot=name;if(!s.manualTitle)s.title=name;await put('sessions',s);}}
+  if(data.current?.clientId===c.id){data.current.clientNameSnapshot=name;if(!data.current.manualTitle)data.current.title=name;await persistCurrent();}
+  await persistSettings();render();
+}
+
+function bindDemoPresentationEvents(){
+  const byId=id=>document.getElementById(id);
+  if(byId('openClientsDirectory'))byId('openClientsDirectory').onclick=()=>{ui.settingsView='clients';render();};
+  if(byId('closeClientsDirectory'))byId('closeClientsDirectory').onclick=()=>{ui.settingsView='main';render();};
+  document.querySelectorAll('[data-demo-theme]').forEach(b=>b.onclick=async()=>{data.settings.theme=b.dataset.demoTheme;await persistSettings();applyTheme();render();});
+  document.querySelectorAll('[data-edit-client-name]').forEach(b=>b.onclick=()=>editClientNameDemo(b.dataset.editClientName));
+  document.querySelectorAll('[data-open-client-chart]').forEach(b=>b.onclick=()=>{ui.modal={type:'clientChart',clientId:b.dataset.openClientChart};render();});
+  if(ui.modal?.type==='clientChart'){
+    const wrap=document.querySelector('.client-chart-wrap');
+    if(byId('closeClientChart'))byId('closeClientChart').onclick=()=>{ui.modal={type:'clientProfile',clientId:ui.modal.clientId};render();};
+    wrap?.addEventListener('click',e=>{if(e.target===wrap){ui.modal={type:'clientProfile',clientId:ui.modal.clientId};render();}});
+  }
+}
+
+const __renderBeforeDemoPresentation=render;
+render=function(){
+  const result=__renderBeforeDemoPresentation();
+  if(ui.modal?.type==='clientChart'&&!document.querySelector('.client-chart-wrap'))$app.insertAdjacentHTML('beforeend',renderClientChartDemo(ui.modal.clientId));
+  bindDemoPresentationEvents();
+  ensureDemoNotice();
+  return result;
+};
+
+
+
+'use strict';
+/* ============================================================
+   Camada final de apresentação — versão sem conceito de áreas
+   O núcleo mantém um único escopo interno apenas por compatibilidade.
+   ============================================================ */
+
+/* Um único escopo interno; nenhuma área é exposta ao usuário. */
+activeAreaId=function(){return 'principal';};
+activeArea=function(){return {id:'principal',name:'Principal',type:'clients'};};
+areaById=function(){return activeArea();};
+areaType=function(){return 'clients';};
+isClientArea=function(){return true;};
+modelAreaId=function(){return 'principal';};
+sessionAreaId=function(){return 'principal';};
+activeAreaBadge=function(){return '';};
+modelOptionsForActiveArea=function(){return activeModels().slice().sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));};
+clientsForArea=function(){return (Array.isArray(data.settings.clients)?data.settings.clients:[]).filter(c=>c&&!c.deletedAt).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));};
+
+/* Tela principal sem selo/menção de área. */
+renderTimers=function(){
+  const models=activeModels(),s=data.current;
+  if(!models.length)return shell(`<header class="topbar simple demo-main-header"><h1>Cronômetro</h1></header><main class="content"><div class="empty">Nenhum modelo criado.<br><br><button class="ios-button" id="createFirst">Criar modelo</button></div></main>`);
+  if(!s)return shell(`<header class="topbar simple demo-main-header"><h1>Cronômetro</h1></header><main class="content"><div class="empty">Escolha um modelo para começar.<br><br><button class="ios-button" id="modelsBack">Ver modelos</button></div></main>${ui.timerView==='models'?renderModelsDrawer():''}`);
+  const model=modelById(s.modelId),timerMode=currentTimerMode(),central=timerMode.layout==='central';
+  const cards=s.timers.sort((a,b)=>a.order-b.order).map(rt=>`<button class="timer-card ${central?'central':''} ${timerStateClass(s,rt)}" data-timer="${rt.id}" aria-label="${esc(rt.name)}, ${fmtDuration(timerDuration(rt))}">${timerStateIcon(s,rt)}<span class="timer-name-wrap">${visualMarkerMarkup(rt.marker)}<span class="name ${timerNameFit(rt.name)}">${esc(rt.name)}${rt.isAdhoc?'<span class="badge">Etapa avulsa</span>':''}</span></span><span class="time">${fmtDuration(timerDuration(rt))}</span></button>`).join('');
+  const running=s.timers.some(isTimerActive),blink=running&&data.settings.blinkTotalColon,totalText=fmtDuration(sessionTotal(s)),widthClass=totalText.length>=9?'total-xlong':totalText.length>=7?'total-hours':'';
+  const display=clientLabelForSession(s),longClient=String(display).length>21;
+  const modelsDrawer=ui.timerView==='models'?renderModelsDrawer():'';
+  const paused=!!openPause(s)&&!running;
+  return shell(`<header class="topbar timer-topbar demo-main-header"><div class="header-row"><button class="circle-button" id="modelsBack" aria-label="Modelos">${svgIcon('back')}</button><button class="current-title ${!s.clientId?'untitled':''} ${longClient?'client-long':''}" id="currentTitleButton">${esc(display)}</button><button class="circle-button" id="sessionMenu" aria-label="Detalhes">${svgIcon('more')}</button></div><div class="model-selected-block"><span class="model-selected-kicker">modelo selecionado</span><div class="current-model-name">${esc(model?.name||s.modelNameSnapshot)}</div></div>${paused?'<div class="status-line demo-pause-status">Atendimento em pausa</div>':s.customized?'<div class="status-line">Personalizado neste registro</div>':''}</header><main class="content timer-content"><div class="timer-list">${cards}<button class="add-card" id="addAdhoc">${svgIcon('plus')}<span>Adicionar cronômetro</span></button></div></main><div class="floating-actions timer-actions ${widthClass}"><section class="total-card floating-card ${running?'running':''}"><span class="total-icon">${svgIcon('clock')}</span><span class="total-copy"><small>Tempo total</small><strong class="total-time">${fmtDurationWithBlinkingColons(sessionTotal(s),blink)}</strong></span></section><button class="save-btn" id="saveBtn">${svgIcon('check')}<span>Salvar</span></button></div>${modelsDrawer}`);
+};
+
+/* Drawer simples: apenas modelos, sem agrupamentos. */
+renderModelsDrawer=function(){
+  const ms=activeModels().slice().sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
+  const rows=ms.map(m=>`<div class="model-row ${data.current?.modelId===m.id?'current':''}"><button class="model-main" data-choose-model="${m.id}"><span>${esc(m.name)}</span></button>${ui.modelsEditing?`<button class="model-more" data-model-options="${m.id}" aria-label="Opções">${svgIcon('more')}</button>`:''}</div>`).join('');
+  return `<div class="models-drawer-backdrop" id="modelsDrawerBackdrop"><aside class="models-drawer"><div class="models-drawer-head"><button id="toggleModelsEdit">${ui.modelsEditing?'Concluir':'Editar'}</button><div><strong>Modelos</strong><small class="presentation-model-count">${ms.length} modelos</small></div><button class="circle-button" id="closeModelsDrawer">${svgIcon('close')}</button></div><main class="models-page"><button class="create-model-card" id="createModel">${svgIcon('plus')}<span>Criar modelo</span></button><section class="presentation-model-list">${rows||'<div class="empty">Nenhum modelo criado.</div>'}</section></main></aside></div>`;
+};
+
+/* Histórico unificado. */
+renderHistory=function(){
+  const sessions=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt).sort((a,b)=>recordDateMs(b)-recordDateMs(a));
+  const filtered=sessions.filter(s=>historyMatchesQuery(s,ui.historyQuery)&&(ui.historyModel==='all'||s.modelId===ui.historyModel)&&(!ui.historyDate||dayKey(recordDateMs(s))===ui.historyDate));
+  const groups={};filtered.forEach(s=>{const k=dayKey(recordDateMs(s));(groups[k]??=[]).push(s);});
+  const list=Object.entries(groups).map(([k,arr])=>`<div class="history-day">${fmtDate(new Date(k+'T12:00:00').getTime())}</div>${arr.map(s=>`<button class="history-card" data-session="${s.id}"><div class="top"><strong class="history-card-client-name">${personIconMarkup()}${esc(sessionDisplayTitle(s))}</strong>${s.isNoMeasurement?'':`<span class="history-total">${svgIcon('timers')}<span>${fmtDuration(sessionTotal(s,s.savedAt))}</span></span>`}</div><div class="history-meta">${esc(s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo')}</div>${s.isNoMeasurement?'<span class="badge">Sem medição</span>':''}${s.restoredAt?'<span class="badge">Restaurado</span>':''}</button>`).join('')}`).join('');
+  const modelOptions=activeModels().slice().sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
+  return shell(`<header class="topbar simple section-tab-header history-header demo-tab-header"><span></span><h1>Registros</h1><button class="header-pill history-trash-button" id="historyTrash">${trashIconMarkup()}<span>Apagados</span></button></header><main class="content history-content"><div class="filters history-filters history-filters-v082"><div class="history-search-wrap"><input id="historySearch" placeholder="Buscar cliente ou registro" value="${esc(ui.historyQuery)}" autocomplete="off">${historyClientSuggestionsMarkup()}</div><select id="historyModel"><option value="all">Todos os modelos</option>${modelOptions.map(m=>`<option value="${m.id}" ${ui.historyModel===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select><div class="date-filter date-filter-v082 ${ui.historyDate?'has-value':''}"><span class="date-placeholder">Filtrar por data</span><input id="historyDate" type="date" value="${esc(ui.historyDate)}">${ui.historyDate?`<button id="historyDateClear" aria-label="Limpar data">${svgIcon('close')}</button>`:''}</div></div>${list||'<div class="empty">Nenhum registro encontrado.</div>'}</main>`);
+};
+
+/* Detalhe sem campo de área. */
+renderSessionDetail=function(s){
+  const model=modelById(s.modelId),timers=[...(s.timers||[])].sort((a,b)=>(a.order??0)-(b.order??0)),gross=recordGrossMs(s),working=sessionTotal(s,s.savedAt),pauses=pauseTotal(s,s.savedAt),heading=clientLabelForSession(s);
+  const appointment=String(s.appointmentNote||s.note||'').trim();
+  return `<div class="modal-wrap record-detail-wrap"><section class="sheet record-detail-sheet"><div class="sheet-head record-detail-head demo-record-head"><button class="circle-button glass record-detail-close" id="closeModal" aria-label="Fechar">${svgIcon('close')}</button><h2 class="record-detail-heading">Detalhes do registro</h2><button class="record-detail-check" id="closeRecordDetail" aria-label="Concluir">${svgIcon('check')}</button></div><div class="record-detail-body"><button class="record-client-heading" data-edit-record-client="${s.id}"><span>${esc(heading)}</span>${svgIcon('pencil')}</button><button class="record-date-button demo-record-date" data-edit-record-date="${s.id}">${esc(fmtDateTime(recordDateMs(s)))} ${svgIcon('pencil')}</button>${appointment?`<section class="record-note-section"><h3 class="record-section-label">Sobre este atendimento</h3><div class="saved-note-card demo-appointment-note">${esc(appointment)}</div><button class="edit-notes-button" data-edit-dual-notes="${s.id}">Editar anotações</button></section>`:`<button class="edit-notes-button demo-add-note" data-edit-dual-notes="${s.id}">Adicionar anotações</button>`}${clientNotesDisclosureDemo(s)}<div class="record-detail-divider"></div><section class="panel record-summary demo-record-summary"><div class="record-model-block"><span class="record-low-label">Modelo</span><strong class="record-model-name">${esc(model?(model.deletedAt?'Modelo excluído':model.name):'Modelo excluído')}</strong></div>${s.isNoMeasurement?'<div class="row"><span class="badge">Sem medição</span></div>':`<div class="record-time-grid"><div><span>Tempo total</span><strong>${fmtDuration(working)}</strong></div><div><span>Tempo decorrido</span><strong>${fmtDuration(gross)}</strong></div><div><span>Pausas</span><strong>${fmtDuration(pauses)}</strong></div></div>`}</section>${!model?`<div class="record-actions"><button data-rebuild-model="${s.id}">Criar modelo deste registro</button></div>`:''}<div class="record-timers-list demo-record-timers">${timers.map(t=>{const d=timerDuration(t,s.savedAt),zero=d<=0,status=zeroMeasurementStatus(t),ignored=t.ignoredIntervals||[];return `<details class="record-timer-card ${zero?'zero':''}"><summary><span class="record-timer-title">${visualMarkerMarkup(t.marker,'record-inline-marker')}${esc(t.name)}${zero&&status==='missing'?'<span class="measurement-missing-badge">Sem medição</span>':''}</span><span class="record-timer-time">${svgIcon('timers')}<strong>${fmtDuration(d)}</strong></span></summary><div class="record-timer-extra">${zero?`<div class="measurement-status-box"><div class="measurement-status-title">Como tratar este zero nas estatísticas?</div><div class="measurement-status-options"><button data-measurement-status="notNeeded" data-session-id="${s.id}" data-timer-id="${t.id}" class="${status==='notNeeded'?'selected':''}">Não foi necessário</button><button data-measurement-status="missing" data-session-id="${s.id}" data-timer-id="${t.id}" class="${status==='missing'?'selected':''}">Sem medição</button></div></div>`:''}${ignored.length?`<div class="ignored-short-note">${ignored.length} toque(s) curto(s) ignorado(s)</div>`:''}<div class="muted small record-interval-label">Horários e intervalos</div>${t.intervals?.length?t.intervals.map(i=>`<div class="row small"><span>${fmtDateTime(i.startedAt)}</span><span>${i.endedAt?fmtDateTime(i.endedAt):'aberto'}</span></div>`).join(''):'<div class="muted small">Nenhum intervalo registrado.</div>'}<button class="action" data-correct-time="${s.id}" data-timer-id="${t.id}">Corrigir tempo</button></div></details>`;}).join('')}</div><div class="record-delete-wrap"><button class="record-delete-button" data-delete-session="${s.id}">${trashIconMarkup()}<span>Excluir registro</span></button><div class="record-delete-help">esse atendimento/registro será movido para “apagados”</div></div></div></section></div>`;
+};
+
+/* Estatísticas de todos os registros. */
+renderStats=function(){
+  const ss=validMeasuredSessions(),count=ss.length,total=ss.reduce((a,s)=>a+sessionTotal(s,s.savedAt),0),avg=count?total/count:0,timers=statsTimerData(ss);let trend='Sem dados suficientes';
+  if(ss.length>=2){const ordered=[...ss].sort((a,b)=>recordDateMs(a)-recordDateMs(b)),half=Math.max(1,Math.floor(ordered.length/2)),a=ordered.slice(0,half).reduce((x,s)=>x+sessionTotal(s,s.savedAt),0)/half,bArr=ordered.slice(-half),b=bArr.reduce((x,s)=>x+sessionTotal(s,s.savedAt),0)/bArr.length,pct=a?((b-a)/a*100):0;trend=pct<0?`${Math.abs(pct).toFixed(1).replace('.',',')}% mais rápido`:`${pct.toFixed(1).replace('.',',')}% mais lento`;}
+  const metricRows=timers.map(x=>{const necessary=x.necessary.length?x.necessary.reduce((a,b)=>a+b,0)/x.necessary.length:null,impact=x.impact.length?x.impact.reduce((a,b)=>a+b,0)/x.impact.length:null,pct=x.seen?x.notNeeded/x.seen*100:0;return `<div class="timer-metric-row"><div class="metric-main"><span>${esc(x.name)}</span><strong>${necessary==null?'—':fmtDuration(necessary)}</strong></div><small>Média quando necessário · impacto médio ${impact==null?'—':fmtDuration(impact)} · não foi necessário ${pct.toFixed(0)}%${x.missing?` · ${x.missing} sem medição`:''}</small></div>`;}).join('')||'<div class="muted">Sem dados.</div>';
+  const clients=new Map();ss.forEach(s=>{if(!s.clientId)return;const x=clients.get(s.clientId)||{name:clientLabelForSession(s),count:0,total:0};x.count++;x.total+=sessionTotal(s,s.savedAt);clients.set(s.clientId,x);});
+  const clientSection=statsSectionDemo('Clientes',[...clients.entries()].sort((a,b)=>b[1].count-a[1].count).map(([id,x])=>`<div class="row"><button class="client-record-open" data-open-client="${id}">${esc(x.name)}</button><strong>${x.count} · média ${fmtDuration(x.total/x.count)}</strong></div>`).join('')||'<div class="muted">Nenhuma cliente vinculada.</div>');
+  const sections=count?[statsSectionDemo('Evolução / tendência',`<div class="stat-big">${esc(trend)}</div><p class="muted small">Comparação da média da primeira metade dos registros com a metade mais recente.</p>`,true),statsSectionDemo('Resumo',`<div class="row"><span>Registros medidos</span><strong>${count}</strong></div><div class="row"><span>Tempo acumulado</span><strong>${fmtDuration(total)}</strong></div><div class="row"><span>Média por registro</span><strong>${fmtDuration(avg)}</strong></div>`),clientSection,statsSectionDemo('Cronômetros — médias e frequência',metricRows),statsSectionDemo('Tempo total por registro',[...ss].sort((a,b)=>recordDateMs(b)-recordDateMs(a)).slice(0,12).map(s=>`<div class="row"><span>${esc(sessionDisplayTitle(s))}</span><strong>${fmtDuration(sessionTotal(s,s.savedAt))}</strong></div>`).join(''))].filter(Boolean).join(''):'';
+  return shell(`<header class="topbar section-tab-header demo-tab-header"><h1>Estatísticas</h1></header><main class="content"><h2 class="section-title">Visão geral</h2>${count?`<div class="stats-grid">${sections}</div>`:`<div class="empty">As estatísticas aparecerão depois que você salvar registros com medição.</div>`}</main>`);
+};
+
+/* Diretório de clientes sem selo de área. */
+renderClientsDirectoryDemo=function(){
+  return shell(`<header class="topbar simple section-tab-header appearance-header demo-tab-header"><button class="appearance-back" id="closeClientsDirectory">${svgIcon('back')}</button><h1>Clientes cadastradas</h1><span></span></header><main class="settings-content clients-directory-screen">${clientDirectoryRowsDemo()}</main>`,'settings');
+};
+
+/* Ajustes sem gerenciamento de áreas. */
+renderSettings=function(){
+  ui.settingsView=ui.settingsView||'main';
+  if(ui.settingsView==='clients')return renderClientsDirectoryDemo();
+  if(ui.settingsView!=='main')return __renderSettingsBeforeDemo();
+  const soundStatus=data.settings.timerSoundEnabled?(data.settings.timerSoundData?'Ativado':'Sem áudio'):'Desativado';
+  return shell(`<header class="topbar simple section-tab-header demo-tab-header"><h1>Ajustes</h1></header><main class="settings-content demo-settings-main"><section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row demo-clients-entry" id="openClientsDirectory"><span>${personIconMarkup()}<strong>Clientes cadastradas</strong></span><span class="secondary-value">Ver lista ›</span></button></div></section>${themeModeCardDemo()}<section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openSoundSettings"><span class="settings-icon-label">${speakerIconDemo()}<span>Som do cronômetro</span></span><span class="secondary-value">${esc(soundStatus)} ›</span></button></div></section><section class="settings-section"><h3 class="section-label">Personalização</h3><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openAppearanceSettings"><span>Aparência e personalização</span><span class="secondary-value">›</span></button></div></section>${renderDataBackupSectionV087()}<section class="settings-section"><div class="settings-card"><div class="settings-row"><span>Versão</span><span class="secondary-value">${esc(APP_META.version)}</span></div></div></section></main>`,'settings');
+};
+
+/* CSV também não expõe o antigo conceito de área. */
+exportCSV=async function(){
+  const rows=[['sessionId','cliente','originalRecordedAt','savedAt','title','modelId','model','recordedTimerId','cronometro','statusMedicao','duracaoMs','tempoTrabalhandoMs','pausasMs','anotacaoAtendimento','anotacaoCliente']];
+  data.sessions.filter(s=>s.status==='saved').forEach(s=>(s.timers||[]).forEach(t=>rows.push([s.id,clientLabelForSession(s),new Date(recordDateMs(s)).toISOString(),new Date(s.savedAt).toISOString(),s.title,s.modelId,s.modelNameSnapshot,t.id,t.name,timerDuration(t,s.savedAt)>0?'medido':zeroMeasurementStatus(t),timerDuration(t,s.savedAt),sessionTotal(s,s.savedAt),pauseTotal(s,s.savedAt),s.appointmentNote||s.note||'',s.clientNote||''])));
+  await shareFile(`cronometro-${dayKey(now())}.csv`,'text/csv;charset=utf-8','\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\n'));
+};
+
+
+/* Edição/criação de modelos sem qualquer referência a áreas. */
+renderEditModel=function(m){
+  const ts=m.timers.filter(t=>!t.removedAt).sort((a,b)=>a.order-b.order);
+  return `<div class="modal-wrap"><section class="sheet"><div class="sheet-head"><h2>${esc(m.name)}</h2><button class="chip" id="closeToModels">Concluir</button></div><div class="toolbar"><button id="renameModel">Renomear modelo</button><button id="addTemplate">＋ Cronômetro</button></div>${ts.length?ts.map((t,i)=>`<div class="panel"><div class="row"><span class="model-timer-heading">${visualMarkerMarkup(t.marker)}<strong>${esc(t.name)}</strong></span><span class="toolbar"><button data-move-template="${t.id}" data-dir="-1" ${i===0?'disabled':''}>↑</button><button data-move-template="${t.id}" data-dir="1" ${i===ts.length-1?'disabled':''}>↓</button></span></div><div class="toolbar"><button data-edit-template="${t.id}">Editar nome</button><button data-model-marker="${t.id}">Marcador</button><button data-remove-template="${t.id}" class="danger">Remover</button></div></div>`).join(''):'<div class="empty">Este modelo está vazio. Você pode mantê-lo assim ou adicionar cronômetros.</div>'}</section></div>`;
+};
+createModel=async function(){
+  const raw=await iosTextPrompt({title:'Novo modelo',message:'Crie um conjunto de cronômetros para reutilizar quando precisar.',placeholder:'Nome do modelo'});const name=String(raw??'').trim();if(!name)return;
+  if(activeModels().some(m=>normalizeSearchText(m.name)===normalizeSearchText(name))){alert('Já existe um modelo com esse nome.');return;}
+  const t=now(),m={id:uid(),name,areaId:'principal',createdAt:t,updatedAt:t,deletedAt:null,sortOrder:nextModelOrder(),timers:[]};data.models.push(m);await put('models',m);data.current=newSession(m);await persistCurrent();ui.modal={type:'editModel',id:m.id};render();
+};
+saveCurrentLayoutAsNewModel=async function(){
+  const s=data.current;if(!s)return;const raw=await iosTextPrompt({title:'Salvar como novo modelo',message:'Salve esta configuração de cronômetros para reutilizar depois.',placeholder:'Nome do novo modelo'});const base=String(raw??'').trim();if(!base)return;
+  if(activeModels().some(m=>normalizeSearchText(m.name)===normalizeSearchText(base))){alert('Já existe um modelo com esse nome.');return;}
+  const t=now(),model={id:uid(),name:base,areaId:'principal',createdAt:t,updatedAt:t,deletedAt:null,sortOrder:nextModelOrder(),timers:s.timers.filter(t=>!t.removedAt&&!t.isRemoved).sort((a,b)=>(a.order??0)-(b.order??0)).map((rt,i)=>({id:uid(),name:rt.name||`Cronômetro ${i+1}`,order:i,createdAt:t,removedAt:null,marker:clone(rt.marker||null)}))};
+  data.models.push(model);await put('models',model);toast('Novo modelo salvo');render();
+};

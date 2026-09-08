@@ -18,7 +18,7 @@
 <script>
 (() => {
   const BETA=location.pathname.includes('/beta/');
-  const DB_NAME='cronometro_public_demo_v1';
+  const DB_NAME='cronometro_public_demo_v4';
   const env=document.getElementById('envLabel');if(BETA){env.textContent='RECUPERAÇÃO · BETA';env.classList.add('beta')}
   const logEl=document.getElementById('log'),dot=document.getElementById('healthDot'),title=document.getElementById('healthTitle'),detail=document.getElementById('healthDetail'),countsCard=document.getElementById('countsCard'),backupBtn=document.getElementById('backupBtn');let db=null;const logs=[];
   function log(msg){logs.push(`${new Date().toLocaleTimeString('pt-BR')}  ${msg}`);logEl.textContent=logs.join('\n')}

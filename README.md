@@ -1,11 +1,14 @@
-# Cronômetro PWA — demonstração pública
+# Cronômetro — demonstração pública
 
-Versão de demonstração do Cronômetro, preparada para apresentação.
+PWA de demonstração criado para apresentar decisões de produto, UX e evolução funcional de um sistema de cronômetros voltado a atendimentos.
 
-- Contém apenas os arquivos necessários para execução pública.
-- Inclui clientes, registros e tempos **fictícios** para facilitar a avaliação das telas de Histórico, Clientes e Estatísticas.
-- O banco IndexedDB desta demonstração é isolado da versão de desenvolvimento/oficial.
-- Os dados permanecem somente no navegador de cada visitante.
-- Funciona como PWA e pode ser adicionado à Tela de Início em navegadores compatíveis.
+## O que esta demonstração mostra
 
-Todos os nomes e atendimentos presentes no banco inicial são dados de demonstração e não correspondem a clientes reais.
+- Modelos de atendimento com cronômetros independentes.
+- Clientes, registros e histórico com dados fictícios.
+- Estatísticas e evolução de tempos.
+- Anotações por atendimento e informações consolidadas por cliente.
+- Backup, restauração, recuperação e modo seguro.
+- Comportamentos contextuais que aparecem conforme o histórico de uso.
+
+Todos os nomes, telefones, atendimentos e tempos carregados inicialmente são fictícios e existem apenas para demonstração.
