@@ -214,6 +214,10 @@
   padding:1px 0 11px!important;
 }
 .record-model-inline{
+  display:flex;
+  align-items:baseline;
+  justify-content:center;
+  gap:4px;
   text-align:center;
   font-size:13px;
   line-height:18px;
@@ -284,6 +288,10 @@
 .client-more-button{display:none!important}
 
 /* Tempos dos cronômetros salvos usam verde, diferenciando-os de ações clicáveis azuis. */
+.demo-record-timers .record-timer-card{
+  border-left-color:var(--running)!important;
+  background:color-mix(in srgb,var(--running) 5%,var(--card))!important;
+}
 .demo-record-timers .record-timer-time,
 .demo-record-timers .record-timer-time .sf-icon,
 .demo-record-timers .record-timer-time strong{
