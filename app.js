@@ -12,7 +12,7 @@
   let finished=false;
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const diagnosticHref=beta?'../diagnostico/':'./diagnostico/';
+  const diagnosticHref='./diagnostico.html';
   const safeHref='./safe.html';
 
   app.innerHTML=`<main id="cronometroBoot" style="min-height:100dvh;display:grid;place-items:center;padding:24px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#F2F2F6;color:#111114">

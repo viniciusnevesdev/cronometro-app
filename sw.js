@@ -13,7 +13,7 @@ const ASSETS=[
   './launch.html',
   './recover.html',
   './safe.html',
-  './diagnostico/index.html'
+  './diagnostico.html'
 ];
 const SCOPE_PATH=new URL(self.registration.scope).pathname;
 
@@ -33,7 +33,7 @@ function relPath(url){
 }
 function isSpecialNavigation(url){
   const rel=relPath(url);
-  return rel==='launch.html'||rel==='recover.html'||rel==='safe.html'||rel.startsWith('diagnostico/');
+  return rel==='launch.html'||rel==='recover.html'||rel==='safe.html'||rel==='diagnostico.html';
 }
 async function networkFirst(request,fallbackIndex=false){
   try{
