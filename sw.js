@@ -1,12 +1,14 @@
 'use strict';
-const CACHE='cronometro-public-presentation-0.8.10-5';
+const CACHE='cronometro-public-presentation-0.8.10-6';
 const ASSETS=[
   './',
   './index.html',
   './styles.css',
   './presentation.css',
+  './analytics.css',
   './app.js',
   './presentation-ui.js',
+  './analytics-ui.js',
   './presentation.js',
   './initial-data.json',
   './manifest.webmanifest',
