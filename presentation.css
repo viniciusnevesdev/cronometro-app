@@ -78,6 +78,27 @@
   height:15px!important;
 }
 
+/* A rotação no contêiner é mais estável no Safari/iOS do que no SVG interno. */
+.timer-state-icon.spin{
+  animation:presentationTimerIconSpin var(--active-disc-duration,1400ms) linear infinite!important;
+  -webkit-transform-origin:50% 50%;
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+.timer-state-icon.spin .sf-icon,
+.timer-state-icon.spin .custom-active-icon{
+  animation:none!important;
+  -webkit-transform:none!important;
+  transform:none!important;
+}
+
+@-webkit-keyframes presentationTimerIconSpin{
+  to{-webkit-transform:rotate(360deg);transform:rotate(360deg)}
+}
+@keyframes presentationTimerIconSpin{
+  to{-webkit-transform:rotate(360deg);transform:rotate(360deg)}
+}
+
 @keyframes presentationBackdropIn{
   from{opacity:0}
   to{opacity:1}
