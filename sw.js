@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='cronometro-public-presentation-0.8.10-3';
+const CACHE='cronometro-public-presentation-0.8.10-4';
 const ASSETS=[
   './',
   './index.html',
