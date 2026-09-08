@@ -35,8 +35,12 @@
 
   function matchesAnalyticsModel(s){return ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId;}
 
+  function savedSessionsFor(bounds){
+    return data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&recordDateMs(s)>=bounds.start&&recordDateMs(s)<=bounds.end&&matchesAnalyticsModel(s));
+  }
+
   function measuredSessionsFor(bounds){
-    return data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&recordDateMs(s)>=bounds.start&&recordDateMs(s)<=bounds.end&&matchesAnalyticsModel(s));
+    return savedSessionsFor(bounds).filter(s=>!s.isNoMeasurement);
   }
 
   function groupsByModel(sessions){
@@ -123,10 +127,10 @@
     return `<div class="analytics-step-trends">${rows.slice(0,6).map(x=>{const tone=x.pct<0?'positive':'negative';return `<div class="analytics-step-trend trend-${tone}"><span class="analytics-step-icon">${analyticsIcon(tone==='positive'?'trendUp':'trendDown')}</span><div><strong>${esc(x.name)}</strong><small>${esc(x.model)}</small></div><em>${fmtPct(x.pct)} ${tone==='positive'?'mais rápida':'mais lenta'}</em></div>`;}).join('')}</div>`;
   }
 
-  function clientActivityMarkup(bounds,current){
-    const visits=current.filter(s=>s.clientId),ids=[...new Set(visits.map(s=>s.clientId))];
+  function clientActivityMarkup(bounds,visitsInRange){
+    const visits=visitsInRange.filter(s=>s.clientId),ids=[...new Set(visits.map(s=>s.clientId))];
     if(!ids.length)return '<div class="analytics-empty-chart">Nenhuma cliente vinculada aos atendimentos deste período.</div>';
-    const history=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&s.clientId&&recordDateMs(s)<bounds.start&&matchesAnalyticsModel(s));
+    const history=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&s.clientId&&recordDateMs(s)<bounds.start&&matchesAnalyticsModel(s));
     const priorIds=new Set(history.map(s=>s.clientId));
     const returning=ids.filter(id=>priorIds.has(id)).length,newClients=ids.length-returning,retention=ids.length?returning/ids.length*100:0,frequency=visits.length/ids.length;
     return `<div class="analytics-client-activity"><div class="analytics-retention-ring" style="--retention-angle:${(retention*3.6).toFixed(1)}deg"><div><strong>${retention.toFixed(0)}%</strong><span>recorrentes</span></div></div><div class="analytics-client-metrics"><div><span>Clientes recorrentes</span><strong>${returning}</strong></div><div><span>Clientes novas</span><strong>${newClients}</strong></div><div><span>Visitas por cliente</span><strong>${frequency.toFixed(1).replace('.',',')}</strong></div></div></div>`;
@@ -138,8 +142,7 @@
 
   function renderAnalytics(){
     const days=ui.analyticsRangeDays,anchor=now(),currentBounds=rangeBounds(days,0,anchor),previousBounds=rangeBounds(days,1,anchor);
-    const current=measuredSessionsFor(currentBounds);
-    const previous=measuredSessionsFor(previousBounds);
+    const currentVisits=savedSessionsFor(currentBounds),current=measuredSessionsFor(currentBounds),previous=measuredSessionsFor(previousBounds);
     const durations=current.map(s=>sessionTotal(s,s.savedAt));
     const grosses=current.map(s=>recordGrossMs(s));
     const pauses=current.map(s=>pauseTotal(s,s.savedAt));
@@ -168,7 +171,7 @@
           </section>
 
           <section class="analytics-kpi-grid">
-            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('clock')}</span><small>Tempo médio</small><strong>${fmtDuration(avg)}</strong><em>${current.length} atendimento${current.length===1?'':'s'} no período</em></article>
+            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('clock')}</span><small>Tempo médio</small><strong>${fmtDuration(avg)}</strong><em>${current.length} atendimento${current.length===1?'':'s'} medido${current.length===1?'':'s'} no período</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('gauge')}</span><small>Tempo típico</small><strong>${fmtDuration(med)}</strong><em>mediana · menos sensível a extremos</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('stable')}</span><small>Consistência</small><strong>${consistency.toFixed(0)}%</strong><em>${consistency>=80?'bem estável':consistency>=60?'variação moderada':'alta variação'} entre serviços iguais</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('pause')}</span><small>Pausas</small><strong>${pauseRatio.toFixed(1).replace('.',',')}%</strong><em>do tempo bruto registrado</em></article>
@@ -177,7 +180,7 @@
           ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
           ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
           ${analyticsCard('Onde seu tempo está indo',bottleneckMarkup(current),'analytics-chart-card')}
-          ${analyticsCard('Clientes no período',clientActivityMarkup(currentBounds,current),'analytics-client-card')}
+          ${analyticsCard('Clientes no período',clientActivityMarkup(currentBounds,currentVisits),'analytics-client-card')}
           ${ui.analyticsModelId==='all'?analyticsCard('Distribuição por modelo',modelBreakdownMarkup(current),'analytics-chart-card'):''}
 
           <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
