@@ -1,647 +1,97 @@
 {
-  "schemaVersion": 6,
-  "factoryDataVersion": 2,
+  "schemaVersion": 1,
   "models": [
     {
       "id": "model-demo-manutencao",
       "name": "Manutenção",
-      "areaId": "principal",
       "createdAt": 1788858633137,
       "updatedAt": 1788858633137,
       "deletedAt": null,
       "sortOrder": 0,
       "timers": [
-        {
-          "id": "t-remocao",
-          "name": "Remoção",
-          "order": 0,
-          "createdAt": 1788858633137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-lev1",
-          "name": "Levantamento de cutícula",
-          "order": 1,
-          "createdAt": 1788858634137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-cuticula",
-          "name": "Corte da cutícula",
-          "order": 2,
-          "createdAt": 1788858635137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-lev2",
-          "name": "2º Levantamento",
-          "order": 3,
-          "createdAt": 1788858636137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-primer",
-          "name": "Primer + Capa base",
-          "order": 4,
-          "createdAt": 1788858637137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-estrutura",
-          "name": "Estrutura",
-          "order": 5,
-          "createdAt": 1788858638137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-lixamento",
-          "name": "Lixamento",
-          "order": 6,
-          "createdAt": 1788858639137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-esmaltacao",
-          "name": "Esmaltação",
-          "order": 7,
-          "createdAt": 1788858640137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-topcoat",
-          "name": "Top Coat",
-          "order": 8,
-          "createdAt": 1788858641137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "t-encerramento",
-          "name": "Encerramento",
-          "order": 9,
-          "createdAt": 1788858642137,
-          "removedAt": null,
-          "marker": null
-        }
+        {"id":"t-remocao","name":"Remoção","order":0,"createdAt":1788858633137,"removedAt":null},
+        {"id":"t-lev1","name":"Levantamento de cutícula","order":1,"createdAt":1788858634137,"removedAt":null},
+        {"id":"t-cuticula","name":"Corte da cutícula","order":2,"createdAt":1788858635137,"removedAt":null},
+        {"id":"t-lev2","name":"2º Levantamento","order":3,"createdAt":1788858636137,"removedAt":null},
+        {"id":"t-primer","name":"Primer + Capa base","order":4,"createdAt":1788858637137,"removedAt":null},
+        {"id":"t-estrutura","name":"Estrutura","order":5,"createdAt":1788858638137,"removedAt":null},
+        {"id":"t-lixamento","name":"Lixamento","order":6,"createdAt":1788858639137,"removedAt":null},
+        {"id":"t-esmaltacao","name":"Esmaltação","order":7,"createdAt":1788858640137,"removedAt":null},
+        {"id":"t-topcoat","name":"Top Coat","order":8,"createdAt":1788858641137,"removedAt":null},
+        {"id":"t-encerramento","name":"Encerramento","order":9,"createdAt":1788858642137,"removedAt":null}
       ]
     },
     {
       "id": "model-demo-alongamento",
       "name": "Alongamento",
-      "areaId": "principal",
       "createdAt": 1788858634137,
       "updatedAt": 1788858634137,
       "deletedAt": null,
       "sortOrder": 1,
       "timers": [
-        {
-          "id": "a-preparo",
-          "name": "Preparação",
-          "order": 0,
-          "createdAt": 1788858633137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-cuticula",
-          "name": "Cutícula",
-          "order": 1,
-          "createdAt": 1788858634137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-molde",
-          "name": "Molde / extensão",
-          "order": 2,
-          "createdAt": 1788858635137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-estrutura",
-          "name": "Construção da estrutura",
-          "order": 3,
-          "createdAt": 1788858636137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-lixa",
-          "name": "Lixamento técnico",
-          "order": 4,
-          "createdAt": 1788858637137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-esmalte",
-          "name": "Esmaltação",
-          "order": 5,
-          "createdAt": 1788858638137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-top",
-          "name": "Top Coat",
-          "order": 6,
-          "createdAt": 1788858639137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "a-final",
-          "name": "Finalização",
-          "order": 7,
-          "createdAt": 1788858640137,
-          "removedAt": null,
-          "marker": null
-        }
+        {"id":"a-preparo","name":"Preparação","order":0,"createdAt":1788858633137,"removedAt":null},
+        {"id":"a-cuticula","name":"Cutícula","order":1,"createdAt":1788858634137,"removedAt":null},
+        {"id":"a-molde","name":"Molde / extensão","order":2,"createdAt":1788858635137,"removedAt":null},
+        {"id":"a-estrutura","name":"Construção da estrutura","order":3,"createdAt":1788858636137,"removedAt":null},
+        {"id":"a-lixa","name":"Lixamento técnico","order":4,"createdAt":1788858637137,"removedAt":null},
+        {"id":"a-esmalte","name":"Esmaltação","order":5,"createdAt":1788858638137,"removedAt":null},
+        {"id":"a-top","name":"Top Coat","order":6,"createdAt":1788858639137,"removedAt":null},
+        {"id":"a-final","name":"Finalização","order":7,"createdAt":1788858640137,"removedAt":null}
       ]
     },
     {
       "id": "model-demo-esmaltacao",
       "name": "Esmaltação em gel",
-      "areaId": "principal",
       "createdAt": 1788858635137,
       "updatedAt": 1788858635137,
       "deletedAt": null,
       "sortOrder": 2,
       "timers": [
-        {
-          "id": "e-preparo",
-          "name": "Preparação",
-          "order": 0,
-          "createdAt": 1788858633137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "e-cuticula",
-          "name": "Cutícula",
-          "order": 1,
-          "createdAt": 1788858634137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "e-base",
-          "name": "Base",
-          "order": 2,
-          "createdAt": 1788858635137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "e-cor",
-          "name": "Esmaltação",
-          "order": 3,
-          "createdAt": 1788858636137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "e-top",
-          "name": "Top Coat",
-          "order": 4,
-          "createdAt": 1788858637137,
-          "removedAt": null,
-          "marker": null
-        },
-        {
-          "id": "e-final",
-          "name": "Finalização",
-          "order": 5,
-          "createdAt": 1788858638137,
-          "removedAt": null,
-          "marker": null
-        }
+        {"id":"e-preparo","name":"Preparação","order":0,"createdAt":1788858633137,"removedAt":null},
+        {"id":"e-cuticula","name":"Cutícula","order":1,"createdAt":1788858634137,"removedAt":null},
+        {"id":"e-base","name":"Base","order":2,"createdAt":1788858635137,"removedAt":null},
+        {"id":"e-cor","name":"Esmaltação","order":3,"createdAt":1788858636137,"removedAt":null},
+        {"id":"e-top","name":"Top Coat","order":4,"createdAt":1788858637137,"removedAt":null},
+        {"id":"e-final","name":"Finalização","order":5,"createdAt":1788858638137,"removedAt":null}
       ]
     }
   ],
+  "clients": [
+    {"id":"client-demo-maria","name":"Maria Eduarda dos Santos","whatsapp":"(11) 98742-6150","createdAt":1788858633137,"updatedAt":1788858633137,"deletedAt":null},
+    {"id":"client-demo-marina","name":"Marina Alves","whatsapp":"(11) 99620-1843","createdAt":1788858633138,"updatedAt":1788858633138,"deletedAt":null},
+    {"id":"client-demo-camila","name":"Camila Rocha","whatsapp":"(11) 99135-7208","createdAt":1788858633139,"updatedAt":1788858633139,"deletedAt":null},
+    {"id":"client-demo-beatriz","name":"Beatriz Souza","whatsapp":"(11) 98561-2394","createdAt":1788858633140,"updatedAt":1788858633140,"deletedAt":null},
+    {"id":"client-demo-julia","name":"Júlia Nunes","whatsapp":"(11) 99814-5037","createdAt":1788858633141,"updatedAt":1788858633141,"deletedAt":null},
+    {"id":"client-demo-ana","name":"Ana Clara Mendes","whatsapp":"(11) 98344-1182","createdAt":1788858633142,"updatedAt":1788858633142,"deletedAt":null},
+    {"id":"client-demo-larissa","name":"Larissa Ferreira","whatsapp":"(11) 99571-4420","createdAt":1788858633143,"updatedAt":1788858633143,"deletedAt":null},
+    {"id":"client-demo-renata","name":"Renata Gomes","whatsapp":"(11) 98206-7731","createdAt":1788858633144,"updatedAt":1788858633144,"deletedAt":null}
+  ],
   "settings": {
     "theme": "system",
-    "colorTheme": "original",
     "timerSize": "small",
-    "simultaneous": "single",
-    "accentColor": "#007AFF",
-    "showVersionBadge": false,
-    "animateActiveTimerIcon": true,
-    "activeTimerAnimationSpeed": "normal",
-    "activeTimerIconSource": "default",
-    "activeTimerIconData": "",
-    "activeTimerIconName": "DVD",
-    "activeTimerIconSize": "standard",
-    "blinkTotalColon": true,
+    "clientEmptyLabel": "selecionar cliente",
     "timerSoundEnabled": false,
     "timerSoundData": "",
     "timerSoundName": "",
     "timerSoundVolume": 0.35,
-    "areas": [
-      {
-        "id": "principal",
-        "name": "Principal",
-        "type": "clients"
-      }
-    ],
-    "activeAreaId": "principal",
-    "clients": [
-      {
-        "id": "client-demo-maria",
-        "areaId": "principal",
-        "name": "Maria Eduarda dos Santos",
-        "whatsapp": "(11) 98742-6150",
-        "createdAt": 1788858633137,
-        "updatedAt": 1788858633137,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-marina",
-        "areaId": "principal",
-        "name": "Marina Alves",
-        "whatsapp": "(11) 99620-1843",
-        "createdAt": 1788858633138,
-        "updatedAt": 1788858633138,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-camila",
-        "areaId": "principal",
-        "name": "Camila Rocha",
-        "whatsapp": "(11) 99135-7208",
-        "createdAt": 1788858633139,
-        "updatedAt": 1788858633139,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-beatriz",
-        "areaId": "principal",
-        "name": "Beatriz Souza",
-        "whatsapp": "(11) 98561-2394",
-        "createdAt": 1788858633140,
-        "updatedAt": 1788858633140,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-julia",
-        "areaId": "principal",
-        "name": "Júlia Nunes",
-        "whatsapp": "(11) 99814-5037",
-        "createdAt": 1788858633141,
-        "updatedAt": 1788858633141,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-ana",
-        "areaId": "principal",
-        "name": "Ana Clara Mendes",
-        "whatsapp": "(11) 98344-1182",
-        "createdAt": 1788858633142,
-        "updatedAt": 1788858633142,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-larissa",
-        "areaId": "principal",
-        "name": "Larissa Ferreira",
-        "whatsapp": "(11) 99571-4420",
-        "createdAt": 1788858633143,
-        "updatedAt": 1788858633143,
-        "deletedAt": null,
-        "aliases": []
-      },
-      {
-        "id": "client-demo-renata",
-        "areaId": "principal",
-        "name": "Renata Gomes",
-        "whatsapp": "(11) 98206-7731",
-        "createdAt": 1788858633144,
-        "updatedAt": 1788858633144,
-        "deletedAt": null,
-        "aliases": []
-      }
-    ],
-    "clientEmptyLabel": "selecionar cliente",
-    "statsCards": [
-      "summary",
-      "total",
-      "timers",
-      "average",
-      "best",
-      "worst",
-      "percent",
-      "trend"
-    ],
-    "ignoreShortMeasurements": true,
-    "shortMeasurementThresholdSec": 10,
-    "uiTextScale": 0.96,
-    "uiCardScale": 0.96,
-    "uiIconScale": 0.96,
-    "uiDensity": "compact",
-    "uiFontPreset": "system"
+    "showDemoNotice": true
   },
   "demo": {
-    "enabled": true,
-    "lastBackupDaysAgo": 9,
     "current": {
       "modelId": "model-demo-manutencao",
       "clientId": "client-demo-maria",
-      "durationsSec": [
-        868,
-        430,
-        511,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ],
       "appointmentNote": "Atendimento de demonstração em andamento.",
-      "clientNote": "Gosta de comprimento médio e formato quadrado suave.",
-      "areaId": "principal"
+      "clientNote": "Gosta de comprimento médio e formato quadrado suave."
     },
     "sessions": [
-      {
-        "id": "demo-s1",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-marina",
-        "daysAgo": 2,
-        "hour": 9,
-        "minute": 20,
-        "durationsMin": [
-          10,
-          6,
-          11,
-          5,
-          5,
-          22,
-          16,
-          13,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção de rotina, sem descolamentos.",
-        "clientNote": "Prefere formato amendoado e acabamento mais natural.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s2",
-        "modelId": "model-demo-esmaltacao",
-        "clientId": "client-demo-camila",
-        "daysAgo": 2,
-        "hour": 14,
-        "minute": 40,
-        "durationsMin": [
-          8,
-          10,
-          6,
-          22,
-          5,
-          3
-        ],
-        "appointmentNote": "Troca de cor e nivelamento leve.",
-        "clientNote": "Costuma escolher tons neutros e leitosos.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s3",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-maria",
-        "daysAgo": 6,
-        "hour": 10,
-        "minute": 10,
-        "durationsMin": [
-          12,
-          7,
-          9,
-          5,
-          5,
-          21,
-          15,
-          12,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção com pequena correção no indicador direito.",
-        "clientNote": "Gosta de comprimento médio e formato quadrado suave.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s4",
-        "modelId": "model-demo-alongamento",
-        "clientId": "client-demo-beatriz",
-        "daysAgo": 6,
-        "hour": 15,
-        "minute": 30,
-        "durationsMin": [
-          12,
-          9,
-          18,
-          32,
-          24,
-          18,
-          6,
-          4
-        ],
-        "appointmentNote": "Primeiro alongamento, estrutura curta e quadrada.",
-        "clientNote": "Prefere decoração discreta, sem relevo.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s5",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-julia",
-        "daysAgo": 10,
-        "hour": 9,
-        "minute": 0,
-        "durationsMin": [
-          11,
-          6,
-          12,
-          6,
-          5,
-          24,
-          18,
-          14,
-          5,
-          4
-        ],
-        "appointmentNote": "Manutenção com 24 dias de crescimento.",
-        "clientNote": "Prefere nail art delicada em duas unhas.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s6",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-ana",
-        "daysAgo": 10,
-        "hour": 13,
-        "minute": 50,
-        "durationsMin": [
-          9,
-          5,
-          10,
-          5,
-          5,
-          20,
-          15,
-          12,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção sem intercorrências.",
-        "clientNote": "Sensível ao lixamento próximo à cutícula.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s7",
-        "modelId": "model-demo-esmaltacao",
-        "clientId": "client-demo-larissa",
-        "daysAgo": 16,
-        "hour": 10,
-        "minute": 30,
-        "durationsMin": [
-          7,
-          9,
-          6,
-          20,
-          5,
-          3
-        ],
-        "appointmentNote": "Esmaltação em gel com reforço de base.",
-        "clientNote": "Gosta de vermelho fechado e acabamento brilhante.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s8",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-renata",
-        "daysAgo": 16,
-        "hour": 16,
-        "minute": 0,
-        "durationsMin": [
-          10,
-          6,
-          10,
-          5,
-          4,
-          20,
-          16,
-          13,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção completa e troca de formato.",
-        "clientNote": "Prefere unhas curtas para trabalhar no computador.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s9",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-marina",
-        "daysAgo": 23,
-        "hour": 9,
-        "minute": 40,
-        "durationsMin": [
-          9,
-          5,
-          10,
-          5,
-          5,
-          20,
-          15,
-          12,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção sem intercorrências.",
-        "clientNote": "Prefere formato amendoado e acabamento mais natural.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s10",
-        "modelId": "model-demo-alongamento",
-        "clientId": "client-demo-julia",
-        "daysAgo": 23,
-        "hour": 14,
-        "minute": 30,
-        "durationsMin": [
-          11,
-          8,
-          17,
-          30,
-          22,
-          17,
-          6,
-          4
-        ],
-        "appointmentNote": "Alongamento com formato bailarina.",
-        "clientNote": "Prefere nail art delicada em duas unhas.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s11",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-maria",
-        "daysAgo": 31,
-        "hour": 10,
-        "minute": 0,
-        "durationsMin": [
-          13,
-          7,
-          9,
-          5,
-          5,
-          23,
-          17,
-          13,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção completa, sem reposições.",
-        "clientNote": "Gosta de comprimento médio e formato quadrado suave.",
-        "areaId": "principal"
-      },
-      {
-        "id": "demo-s12",
-        "modelId": "model-demo-manutencao",
-        "clientId": "client-demo-camila",
-        "daysAgo": 31,
-        "hour": 15,
-        "minute": 20,
-        "durationsMin": [
-          10,
-          6,
-          10,
-          5,
-          4,
-          20,
-          16,
-          13,
-          5,
-          3
-        ],
-        "appointmentNote": "Manutenção completa e troca de cor.",
-        "clientNote": "Costuma escolher tons neutros e leitosos.",
-        "areaId": "principal"
-      }
+      {"id":"demo-s1","modelId":"model-demo-manutencao","clientId":"client-demo-marina","daysAgo":2,"hour":9,"minute":20,"durationsMin":[10,6,11,5,5,22,16,13,5,3],"appointmentNote":"Manutenção de rotina, sem descolamentos.","clientNote":"Prefere formato amendoado e acabamento natural."},
+      {"id":"demo-s2","modelId":"model-demo-esmaltacao","clientId":"client-demo-camila","daysAgo":2,"hour":14,"minute":40,"durationsMin":[8,10,6,22,5,3],"appointmentNote":"Troca de cor e nivelamento leve.","clientNote":"Costuma escolher tons neutros e leitosos."},
+      {"id":"demo-s3","modelId":"model-demo-manutencao","clientId":"client-demo-maria","daysAgo":6,"hour":10,"minute":10,"durationsMin":[12,7,9,5,5,21,15,12,5,3],"appointmentNote":"Manutenção com pequena correção no indicador direito.","clientNote":"Gosta de comprimento médio e formato quadrado suave."},
+      {"id":"demo-s4","modelId":"model-demo-alongamento","clientId":"client-demo-beatriz","daysAgo":6,"hour":15,"minute":30,"durationsMin":[12,9,18,32,24,18,6,4],"appointmentNote":"Primeiro alongamento, estrutura curta e quadrada.","clientNote":"Prefere decoração discreta, sem relevo."},
+      {"id":"demo-s5","modelId":"model-demo-manutencao","clientId":"client-demo-julia","daysAgo":10,"hour":9,"minute":0,"durationsMin":[11,6,12,6,5,24,18,14,5,4],"appointmentNote":"Manutenção com 24 dias de crescimento.","clientNote":"Prefere nail art delicada em duas unhas."},
+      {"id":"demo-s6","modelId":"model-demo-esmaltacao","clientId":"client-demo-ana","daysAgo":10,"hour":13,"minute":30,"durationsMin":[7,9,5,20,5,3],"appointmentNote":"Esmaltação em gel com acabamento vermelho fechado.","clientNote":"Prefere cores intensas e unhas curtas."},
+      {"id":"demo-s7","modelId":"model-demo-alongamento","clientId":"client-demo-larissa","daysAgo":15,"hour":10,"minute":40,"durationsMin":[11,8,17,30,22,17,6,4],"appointmentNote":"Alongamento com correção de formato.","clientNote":"Gosta de formato oval e comprimento médio."},
+      {"id":"demo-s8","modelId":"model-demo-manutencao","clientId":"client-demo-renata","daysAgo":15,"hour":16,"minute":0,"durationsMin":[10,7,10,5,5,23,17,13,5,3],"appointmentNote":"Manutenção e troca completa de cor.","clientNote":"Costuma optar por esmaltação clara e sem decoração."}
     ]
   }
 }
