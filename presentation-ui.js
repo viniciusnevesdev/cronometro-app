@@ -96,7 +96,9 @@
       const html = baseRenderStats();
       return html.replace(/<div class="stat-big">([^<]*)<\/div>/,(_,raw)=>{
         const text = String(raw || '');
-        const tone = text.includes('mais rápido') ? 'positive' : text.includes('mais lento') ? 'negative' : 'neutral';
+        const match = text.match(/([0-9]+(?:[,.][0-9]+)?)%/);
+        const magnitude = match ? Number(match[1].replace(',','.')) : NaN;
+        const tone = Number.isFinite(magnitude) && magnitude === 0 ? 'neutral' : text.includes('mais rápido') ? 'positive' : text.includes('mais lento') ? 'negative' : 'neutral';
         return `<div class="stat-big trend-result trend-${tone}">${trendIcon(tone)}<span>${text}</span></div>`;
       });
     };
