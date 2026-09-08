@@ -27,14 +27,16 @@
     layers:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></svg>'
   }[name] || '');
 
-  function rangeBounds(days, offset=0){
-    const end = now() - (offset * days * 86400000);
+  function rangeBounds(days, offset=0,anchor=now()){
+    const end = anchor - (offset * days * 86400000);
     const start = end - (days * 86400000);
     return {start,end};
   }
 
+  function matchesAnalyticsModel(s){return ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId;}
+
   function measuredSessionsFor(bounds){
-    return data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&recordDateMs(s)>=bounds.start&&recordDateMs(s)<=bounds.end&&(ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId));
+    return data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&recordDateMs(s)>=bounds.start&&recordDateMs(s)<=bounds.end&&matchesAnalyticsModel(s));
   }
 
   function groupsByModel(sessions){
@@ -90,7 +92,8 @@
     const path=pts.map((p,i)=>`${i?'L':'M'} ${p.px.toFixed(1)} ${p.py.toFixed(1)}`).join(' ');
     const guides=[0,.5,1].map(f=>{const y=pT+innerH*(1-f),value=minY+range*f;return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}"/><text x="${pL-7}" y="${y+4}" text-anchor="end">${esc(fmtDuration(value))}</text>`;}).join('');
     const dots=pts.map((p,i)=>`<circle cx="${p.px}" cy="${p.py}" r="4"><title>${esc(p.label)} · ${esc(fmtDuration(p.y))}</title></circle>${(i===0||i===pts.length-1||pts.length<=5)?`<text x="${p.px}" y="${H-9}" text-anchor="middle" class="analytics-date-label">${esc(p.label.slice(0,5))}</text>`:''}`).join('');
-    return `<svg class="analytics-line-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução do tempo trabalhado por atendimento">${guides}<path class="analytics-trend-line" d="${path}"/>${dots}</svg>`;
+    const note=ui.analyticsModelId==='all'?'<p class="analytics-chart-note">Os serviços têm durações diferentes. Use o filtro de modelo para uma leitura precisa da curva.</p>':'';
+    return `${note}<svg class="analytics-line-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução do tempo trabalhado por atendimento">${guides}<path class="analytics-trend-line" d="${path}"/>${dots}</svg>`;
   }
 
   function modelBreakdownMarkup(sessions){
@@ -120,14 +123,23 @@
     return `<div class="analytics-step-trends">${rows.slice(0,6).map(x=>{const tone=x.pct<0?'positive':'negative';return `<div class="analytics-step-trend trend-${tone}"><span class="analytics-step-icon">${analyticsIcon(tone==='positive'?'trendUp':'trendDown')}</span><div><strong>${esc(x.name)}</strong><small>${esc(x.model)}</small></div><em>${fmtPct(x.pct)} ${tone==='positive'?'mais rápida':'mais lenta'}</em></div>`;}).join('')}</div>`;
   }
 
+  function clientActivityMarkup(bounds,current){
+    const visits=current.filter(s=>s.clientId),ids=[...new Set(visits.map(s=>s.clientId))];
+    if(!ids.length)return '<div class="analytics-empty-chart">Nenhuma cliente vinculada aos atendimentos deste período.</div>';
+    const history=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&s.clientId&&recordDateMs(s)<bounds.start&&matchesAnalyticsModel(s));
+    const priorIds=new Set(history.map(s=>s.clientId));
+    const returning=ids.filter(id=>priorIds.has(id)).length,newClients=ids.length-returning,retention=ids.length?returning/ids.length*100:0,frequency=visits.length/ids.length;
+    return `<div class="analytics-client-activity"><div class="analytics-retention-ring" style="--retention-angle:${(retention*3.6).toFixed(1)}deg"><div><strong>${retention.toFixed(0)}%</strong><span>recorrentes</span></div></div><div class="analytics-client-metrics"><div><span>Clientes recorrentes</span><strong>${returning}</strong></div><div><span>Clientes novas</span><strong>${newClients}</strong></div><div><span>Visitas por cliente</span><strong>${frequency.toFixed(1).replace('.',',')}</strong></div></div></div>`;
+  }
+
   function analyticsCard(title,body,extra=''){
     return `<section class="analytics-card ${extra}"><h3>${title}</h3>${body}</section>`;
   }
 
   function renderAnalytics(){
-    const days=ui.analyticsRangeDays;
-    const current=measuredSessionsFor(rangeBounds(days,0));
-    const previous=measuredSessionsFor(rangeBounds(days,1));
+    const days=ui.analyticsRangeDays,anchor=now(),currentBounds=rangeBounds(days,0,anchor),previousBounds=rangeBounds(days,1,anchor);
+    const current=measuredSessionsFor(currentBounds);
+    const previous=measuredSessionsFor(previousBounds);
     const durations=current.map(s=>sessionTotal(s,s.savedAt));
     const grosses=current.map(s=>recordGrossMs(s));
     const pauses=current.map(s=>pauseTotal(s,s.savedAt));
@@ -137,7 +149,7 @@
     const trend=trendData(current,previous);
     const toneIcon=trend.tone==='positive'?'trendUp':trend.tone==='negative'?'trendDown':'stable';
     const models=activeModels().slice().sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
-    const all=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&(ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId));
+    const all=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&matchesAnalyticsModel(s));
     const globalAvg=mean(all.map(s=>sessionTotal(s,s.savedAt)));
     const rangeLabel=days===365?'último ano':`últimos ${days} dias`;
     const comparisonNote=ui.analyticsModelId==='all'?'comparação ajustada por modelo':'comparado com o período anterior';
@@ -165,6 +177,7 @@
           ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
           ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
           ${analyticsCard('Onde seu tempo está indo',bottleneckMarkup(current),'analytics-chart-card')}
+          ${analyticsCard('Clientes no período',clientActivityMarkup(currentBounds,current),'analytics-client-card')}
           ${ui.analyticsModelId==='all'?analyticsCard('Distribuição por modelo',modelBreakdownMarkup(current),'analytics-chart-card'):''}
 
           <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
