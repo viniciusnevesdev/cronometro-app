@@ -37,14 +37,47 @@
     return data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&recordDateMs(s)>=bounds.start&&recordDateMs(s)<=bounds.end&&(ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId));
   }
 
+  function groupsByModel(sessions){
+    const map=new Map();
+    sessions.forEach(s=>{if(!map.has(s.modelId))map.set(s.modelId,[]);map.get(s.modelId).push(s);});
+    return map;
+  }
+
   function trendData(current,previous){
-    const c = current.map(s=>sessionTotal(s,s.savedAt));
-    const p = previous.map(s=>sessionTotal(s,s.savedAt));
-    if(!c.length || !p.length) return {tone:'neutral',label:'Sem comparação suficiente',pct:null};
-    const cm = mean(c), pm = mean(p), pct = pm ? ((cm-pm)/pm*100) : 0;
+    if(!current.length || !previous.length) return {tone:'neutral',label:'Sem comparação suficiente',pct:null};
+    let pct=0;
+    if(ui.analyticsModelId!=='all'){
+      const cm=mean(current.map(s=>sessionTotal(s,s.savedAt))),pm=mean(previous.map(s=>sessionTotal(s,s.savedAt)));
+      pct=pm?((cm-pm)/pm*100):0;
+    }else{
+      const cGroups=groupsByModel(current),pGroups=groupsByModel(previous),parts=[];
+      cGroups.forEach((sessions,modelId)=>{
+        const prev=pGroups.get(modelId);if(!prev?.length)return;
+        const cm=mean(sessions.map(s=>sessionTotal(s,s.savedAt))),pm=mean(prev.map(s=>sessionTotal(s,s.savedAt)));
+        if(pm)parts.push({pct:(cm-pm)/pm*100,weight:sessions.length});
+      });
+      if(!parts.length)return {tone:'neutral',label:'Sem comparação suficiente',pct:null};
+      pct=parts.reduce((sum,x)=>sum+x.pct*x.weight,0)/parts.reduce((sum,x)=>sum+x.weight,0);
+    }
     if(Math.abs(pct) < 0.5) return {tone:'neutral',label:'Tempo praticamente estável',pct};
     if(pct < 0) return {tone:'positive',label:`${fmtPct(pct)} mais rápido`,pct};
     return {tone:'negative',label:`${fmtPct(pct)} mais lento`,pct};
+  }
+
+  function consistencyScore(sessions){
+    if(!sessions.length)return 0;
+    const groups=groupsByModel(sessions),parts=[];
+    groups.forEach(items=>{
+      const vals=items.map(s=>sessionTotal(s,s.savedAt));
+      if(vals.length<2)return;
+      const m=mean(vals);if(!m)return;
+      parts.push({score:Math.max(0,100-(standardDeviation(vals)/m*100)),weight:vals.length});
+    });
+    if(!parts.length){
+      const vals=sessions.map(s=>sessionTotal(s,s.savedAt)),m=mean(vals);
+      return m?Math.max(0,100-(standardDeviation(vals)/m*100)):0;
+    }
+    return parts.reduce((sum,x)=>sum+x.score*x.weight,0)/parts.reduce((sum,x)=>sum+x.weight,0);
   }
 
   function lineChartMarkup(sessions){
@@ -71,11 +104,20 @@
 
   function bottleneckMarkup(sessions){
     const map=new Map();
-    sessions.forEach(s=>(s.timers||[]).forEach(t=>{const d=timerDuration(t,s.savedAt);if(d<=0)return;const x=map.get(t.name)||{sum:0,count:0};x.sum+=d;x.count++;map.set(t.name,x);}));
-    const rows=[...map.entries()].map(([name,x])=>({name,avg:x.sum/x.count})).sort((a,b)=>b.avg-a.avg).slice(0,5);
+    sessions.forEach(s=>(s.timers||[]).forEach(t=>{const d=timerDuration(t,s.savedAt);if(d<=0)return;const key=`${s.modelId}::${t.name}`,x=map.get(key)||{name:t.name,model:s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo',sum:0,count:0};x.sum+=d;x.count++;map.set(key,x);}));
+    const rows=[...map.values()].map(x=>({...x,avg:x.sum/x.count})).sort((a,b)=>b.avg-a.avg).slice(0,5);
     if(!rows.length)return '<div class="analytics-empty-chart">Sem tempos de etapas suficientes.</div>';
     const max=Math.max(...rows.map(x=>x.avg),1);
-    return `<div class="analytics-bars bottleneck-bars">${rows.map(x=>`<div class="analytics-bar-row"><div><span>${esc(x.name)}</span><strong>${fmtDuration(x.avg)}</strong></div><div class="analytics-bar-track"><span style="width:${Math.max(5,x.avg/max*100)}%"></span></div></div>`).join('')}</div>`;
+    return `<div class="analytics-bars bottleneck-bars">${rows.map(x=>`<div class="analytics-bar-row"><div><span>${esc(x.name)}<small>${esc(x.model)}</small></span><strong>${fmtDuration(x.avg)}</strong></div><div class="analytics-bar-track"><span style="width:${Math.max(5,x.avg/max*100)}%"></span></div></div>`).join('')}</div>`;
+  }
+
+  function stepTrendMarkup(current,previous){
+    const collect=sessions=>{const map=new Map();sessions.forEach(s=>(s.timers||[]).forEach(t=>{const d=timerDuration(t,s.savedAt);if(d<=0)return;const key=`${s.modelId}::${t.name}`,x=map.get(key)||{name:t.name,model:s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo',vals:[]};x.vals.push(d);map.set(key,x);}));return map;};
+    const c=collect(current),p=collect(previous),rows=[];
+    c.forEach((x,key)=>{const prev=p.get(key);if(!prev?.vals.length)return;const pm=mean(prev.vals),cm=mean(x.vals);if(!pm)return;const pct=(cm-pm)/pm*100;if(Math.abs(pct)<1)return;rows.push({...x,pct});});
+    rows.sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct));
+    if(!rows.length)return '<div class="analytics-empty-chart">Ainda não há etapas comparáveis suficientes entre os dois períodos.</div>';
+    return `<div class="analytics-step-trends">${rows.slice(0,6).map(x=>{const tone=x.pct<0?'positive':'negative';return `<div class="analytics-step-trend trend-${tone}"><span class="analytics-step-icon">${analyticsIcon(tone==='positive'?'trendUp':'trendDown')}</span><div><strong>${esc(x.name)}</strong><small>${esc(x.model)}</small></div><em>${fmtPct(x.pct)} ${tone==='positive'?'mais rápida':'mais lenta'}</em></div>`;}).join('')}</div>`;
   }
 
   function analyticsCard(title,body,extra=''){
@@ -89,7 +131,7 @@
     const durations=current.map(s=>sessionTotal(s,s.savedAt));
     const grosses=current.map(s=>recordGrossMs(s));
     const pauses=current.map(s=>pauseTotal(s,s.savedAt));
-    const avg=mean(durations),med=median(durations),sd=standardDeviation(durations),consistency=avg?Math.max(0,100-(sd/avg*100)):0;
+    const avg=mean(durations),med=median(durations),consistency=consistencyScore(current);
     const pauseTotalMs=pauses.reduce((a,b)=>a+b,0), grossTotalMs=grosses.reduce((a,b)=>a+b,0);
     const pauseRatio=grossTotalMs?pauseTotalMs/grossTotalMs*100:0;
     const trend=trendData(current,previous);
@@ -98,6 +140,7 @@
     const all=data.sessions.filter(s=>s.status==='saved'&&!s.deletedAt&&!s.isNoMeasurement&&(ui.analyticsModelId==='all'||s.modelId===ui.analyticsModelId));
     const globalAvg=mean(all.map(s=>sessionTotal(s,s.savedAt)));
     const rangeLabel=days===365?'último ano':`últimos ${days} dias`;
+    const comparisonNote=ui.analyticsModelId==='all'?'comparação ajustada por modelo':'comparado com o período anterior';
 
     return shell(`<header class="topbar section-tab-header demo-tab-header compact-tab-header analytics-header"><h1>Estatísticas</h1></header>
       <main class="content analytics-content">
@@ -109,19 +152,20 @@
         ${!current.length?`<div class="empty analytics-empty">Nenhum atendimento medido nos ${esc(rangeLabel)}.</div>`:`
           <section class="analytics-hero trend-${trend.tone}">
             <div class="analytics-hero-icon">${analyticsIcon(toneIcon)}</div>
-            <div><small>Evolução do tempo médio</small><strong>${esc(trend.label)}</strong><span>comparado com o período anterior</span></div>
+            <div><small>Evolução do tempo médio</small><strong>${esc(trend.label)}</strong><span>${esc(comparisonNote)}</span></div>
           </section>
 
           <section class="analytics-kpi-grid">
-            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('clock')}</span><small>Tempo médio</small><strong>${fmtDuration(avg)}</strong><em>${current.length} atendimento${current.length===1?'':'s'}</em></article>
-            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('gauge')}</span><small>Tempo típico</small><strong>${fmtDuration(med)}</strong><em>mediana do período</em></article>
-            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('stable')}</span><small>Consistência</small><strong>${consistency.toFixed(0)}%</strong><em>${consistency>=80?'bem estável':consistency>=60?'variação moderada':'alta variação'}</em></article>
-            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('pause')}</span><small>Pausas</small><strong>${pauseRatio.toFixed(1).replace('.',',')}%</strong><em>do tempo bruto</em></article>
+            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('clock')}</span><small>Tempo médio</small><strong>${fmtDuration(avg)}</strong><em>${current.length} atendimento${current.length===1?'':'s'} no período</em></article>
+            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('gauge')}</span><small>Tempo típico</small><strong>${fmtDuration(med)}</strong><em>mediana · menos sensível a extremos</em></article>
+            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('stable')}</span><small>Consistência</small><strong>${consistency.toFixed(0)}%</strong><em>${consistency>=80?'bem estável':consistency>=60?'variação moderada':'alta variação'} entre serviços iguais</em></article>
+            <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('pause')}</span><small>Pausas</small><strong>${pauseRatio.toFixed(1).replace('.',',')}%</strong><em>do tempo bruto registrado</em></article>
           </section>
 
-          ${analyticsCard('Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
+          ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
+          ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
           ${analyticsCard('Onde seu tempo está indo',bottleneckMarkup(current),'analytics-chart-card')}
-          ${analyticsCard('Distribuição por modelo',modelBreakdownMarkup(current),'analytics-chart-card')}
+          ${ui.analyticsModelId==='all'?analyticsCard('Distribuição por modelo',modelBreakdownMarkup(current),'analytics-chart-card'):''}
 
           <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
         `}
@@ -146,4 +190,6 @@
       if(modelFilter)modelFilter.onchange=()=>{ui.analyticsModelId=modelFilter.value;render();};
     };
   }
+
+  setTimeout(()=>{if(ui?.tab==='stats'||ui?.tab==='settings')render();},0);
 })();
