@@ -3113,7 +3113,7 @@ document.addEventListener('click',async event=>{
   applyVisualStyleV088(mode);
   try{await persistSettings();}catch(error){console.error('Falha ao salvar estilo visual',error);}
   render();
-  toast(mode==='ultra'?'Modo Ultra ativado':'Modo Clássico ativado');
+  toast(mode==='ultra'?'Modo Ultra ativado':'Modo Otimizado ativado');
 });
 
 applyVisualStyleV088('classic');

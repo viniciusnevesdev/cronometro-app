@@ -145,8 +145,8 @@
 
   function clientTimeExtremes(sessions,dir){const map=new Map();sessions.filter(s=>s.clientId).forEach(s=>{const x=map.get(s.clientId)||{id:s.clientId,sum:0,count:0};x.sum+=sessionTotal(s,s.savedAt);x.count++;map.set(s.clientId,x);});const rows=[...map.values()].map(x=>({...x,avg:x.sum/x.count,name:clientLabelForSession({clientId:x.id})})).sort((a,b)=>dir==='max'?b.avg-a.avg:a.avg-b.avg);if(!rows.length)return '<div class="analytics-empty-chart">Nenhuma cliente com atendimento medido neste período.</div>';const x=rows[0];return `<button class="analytics-client-extreme" data-open-client="${esc(x.id)}">${personIconMarkup()}<span>${esc(x.name)}</span><strong>${fmtDuration(x.avg)}</strong></button>`;}
 
-  function analyticsCard(title,body,extra=''){
-    return `<section class="analytics-card ${extra}"><h3>${title}</h3>${body}</section>`;
+  function analyticsCard(title,body,extra='',period=''){
+    return `<section class="analytics-card ${extra}"><h3>${title}</h3>${period?`<small class="analytics-period-label">${esc(period)}</small>`:''}${body}</section>`;
   }
 
   function renderAnalytics(){
@@ -188,11 +188,11 @@
 
           ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
           ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
-          ${ui.analyticsModelId==='all'?analyticsCard('Número de atendimentos',modelBreakdownMarkup(current),'analytics-chart-card'):''}
-          ${analyticsCard('Clientes novas',newClientsMarkup(currentBounds,days),'analytics-client-card')}
-          ${analyticsCard('Cliente que você mais leva tempo',clientTimeExtremes(current,'max'),'analytics-client-card')}
-          ${analyticsCard('Cliente que você leva menos tempo',clientTimeExtremes(current,'min'),'analytics-client-card')}
-          ${analyticsCard('Onde seu tempo está indo',`<p class="analytics-card-description">Mostra as etapas com maior tempo médio entre os atendimentos selecionados.</p>${bottleneckMarkup(current)}`,'analytics-chart-card')}
+          ${ui.analyticsModelId==='all'?analyticsCard('Número de atendimentos',modelBreakdownMarkup(current),'analytics-chart-card',rangeLabel):''}
+          ${analyticsCard('Clientes novas',newClientsMarkup(currentBounds,days),'analytics-client-card',rangeLabel)}
+          ${analyticsCard('Cliente que você mais leva tempo',clientTimeExtremes(current,'max'),'analytics-client-card',rangeLabel)}
+          ${analyticsCard('Cliente que você leva menos tempo',clientTimeExtremes(current,'min'),'analytics-client-card',rangeLabel)}
+          ${analyticsCard('Onde seu tempo está indo',`<p class="analytics-card-description">Mostra as etapas com maior tempo médio entre os atendimentos selecionados.</p>${bottleneckMarkup(current)}`,'analytics-chart-card',rangeLabel)}
 
           <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
         `}
@@ -212,9 +212,9 @@
   if(baseBindV082Events){
     bindV082Events = function(){
       baseBindV082Events();
-      document.querySelectorAll('[data-analytics-range]').forEach(b=>b.onclick=()=>{ui.analyticsRangeDays=Number(b.dataset.analyticsRange);render();});
+      document.querySelectorAll('[data-analytics-range]').forEach(b=>b.onclick=()=>{const y=window.scrollY;ui.analyticsRangeDays=Number(b.dataset.analyticsRange);render();requestAnimationFrame(()=>window.scrollTo(0,y));});
       const modelFilter=document.getElementById('analyticsModelFilter');
-      if(modelFilter)modelFilter.onchange=()=>{ui.analyticsModelId=modelFilter.value;render();};
+      if(modelFilter)modelFilter.onchange=()=>{const y=window.scrollY;ui.analyticsModelId=modelFilter.value;render();requestAnimationFrame(()=>window.scrollTo(0,y));};
     };
   }
 
