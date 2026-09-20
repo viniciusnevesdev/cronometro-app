@@ -1,0 +1,14 @@
+{
+  "stable": {
+    "environment": "uze",
+    "release": "0.8.10",
+    "database": "cronometro_public_demo_v4",
+    "cachePrefix": "cronometro-uze-"
+  },
+  "beta": {
+    "environment": "uze-beta",
+    "release": "0.8.11-beta.1",
+    "database": "cronometro_uze_beta_v1",
+    "cachePrefix": "cronometro-uze-beta-"
+  }
+}
