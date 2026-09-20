@@ -76,6 +76,13 @@
   };
   const baseSvg=svgIcon;
   svgIcon=name=>tabSvg[name]||baseSvg(name);
+  const baseSettings=renderSettings;
+  renderSettings=function(){
+    if(ui.settingsView==='sound'||ui.settingsView==='appearance'||ui.settingsView==='advanced')return baseSettings();
+    const theme=data.settings.theme||'system',release=String(window.APP_RELEASE||'');
+    const note='<svg class="sf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>';
+    return shell(`<header class="topbar section-tab-header"><h1>Ajustes</h1></header><main class="settings-content settings-v090"><section class="settings-section"><div class="settings-card theme-mode-card"><div class="theme-mode-segment">${[['system','Sistema'],['light','Claro'],['dark','Escuro']].map(([id,label])=>`<button data-uze-theme="${id}" class="${theme===id?'selected':''}">${label}</button>`).join('')}</div></div></section><section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openSoundSettings"><span>${note} Som do cronômetro</span><span class="secondary-value">${data.settings.timerSoundEnabled?'Ativado':'Desativado'} ›</span></button><button class="settings-row button-row" id="openAppearanceSettings"><span>Aparência</span><span class="secondary-value">Clássico, Ultra e ícones ›</span></button></div></section><section class="settings-section"><h3 class="section-label">Dados</h3><div class="data-backup-card"><button class="data-backup-row" id="exportJson"><span class="data-backup-row-copy"><strong class="data-backup-row-title">Exportar backup</strong><span class="data-backup-row-subtitle">${data.settings.lastBackupExportAt?'Último backup registrado':'Nenhum backup registrado'}</span></span></button><label class="data-backup-row" for="importJsonFile"><span class="data-backup-row-copy"><strong class="data-backup-row-title">Restaurar backup</strong><span class="data-backup-row-subtitle">Substitui os dados atuais pelo backup JSON</span></span><input id="importJsonFile" class="sr-only" type="file" accept="application/json,.json"></label></div></section><section class="settings-section"><h3 class="section-label">Outros formatos</h3><div class="settings-card"><button class="settings-row button-row" id="exportCsv"><span>Exportar CSV</span></button><button class="settings-row button-row" id="exportPdf"><span>Exportar PDF</span></button></div></section><p class="settings-version-v090">Versão ${release}</p></main>`);
+  };
   const baseRender=render;
   render=function(){
     const result=baseRender();
@@ -85,6 +92,7 @@
       if(!badge){badge=document.createElement('span');badge.id='uzeBetaVersionBadge';badge.className='app-version-badge uze-beta-version-badge';root.appendChild(badge);}
       badge.textContent=RELEASE;
     }
+    document.querySelectorAll('[data-uze-theme]').forEach(button=>button.onclick=async()=>{data.settings.theme=button.dataset.uzeTheme;await persistSettings();applyTheme();render();});
     return result;
   };
   window.addEventListener('load',()=>setTimeout(async()=>{
