@@ -1,0 +1,9 @@
+{
+  "environment": "uze-beta",
+  "release": "0.8.11-beta.1",
+  "database": "cronometro_uze_beta_v1",
+  "cachePrefix": "cronometro-uze-beta-",
+  "branch": "uze-beta",
+  "stable": false,
+  "path": "/beta/"
+}

@@ -1,0 +1,416 @@
+/* Elementos exclusivos da apresentação pública. */
+.demo-presentation-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:19990;
+  background:rgba(0,0,0,.16);
+  -webkit-backdrop-filter:blur(1.5px);
+  backdrop-filter:blur(1.5px);
+  animation:presentationBackdropIn .2s ease-out both;
+}
+
+.demo-presentation-notice{
+  position:fixed!important;
+  z-index:20000!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  width:min(390px,calc(100vw - 36px))!important;
+  padding:21px 48px 20px 20px!important;
+  transform:translate(-50%,-50%)!important;
+  border:1px solid color-mix(in srgb,#ff9500 48%,var(--line))!important;
+  border-radius:24px!important;
+  background:color-mix(in srgb,var(--card) 97%,transparent)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,149,0,.08),
+    0 0 34px rgba(255,149,0,.22),
+    0 22px 60px rgba(0,0,0,.20)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(145%)!important;
+  backdrop-filter:blur(24px) saturate(145%)!important;
+  animation:presentationNoticeIn .24s cubic-bezier(.2,.8,.2,1) both!important;
+}
+
+.demo-presentation-notice .presentation-notice-icon{
+  width:44px;
+  height:44px;
+  margin:0 auto 12px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  font-size:25px;
+  line-height:1;
+  background:rgba(255,149,0,.13);
+  box-shadow:inset 0 0 0 1px rgba(255,149,0,.18);
+}
+
+.demo-presentation-notice strong{
+  display:block;
+  text-align:center;
+  font-size:16px!important;
+  line-height:21px;
+  font-weight:750;
+  letter-spacing:-.01em;
+}
+
+.demo-presentation-notice p{
+  margin:7px 0 0!important;
+  color:var(--secondary)!important;
+  font-size:12.5px!important;
+  line-height:18px!important;
+}
+
+.demo-presentation-notice>button{
+  position:absolute!important;
+  top:12px!important;
+  right:12px!important;
+  width:32px!important;
+  height:32px!important;
+  border:0!important;
+  border-radius:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+  background:color-mix(in srgb,var(--secondary) 11%,transparent)!important;
+  color:var(--secondary)!important;
+}
+
+.demo-presentation-notice>button .sf-icon{
+  width:15px!important;
+  height:15px!important;
+}
+
+/* A rotação no contêiner é mais estável no Safari/iOS do que no SVG interno. */
+.timer-state-icon.spin{
+  animation:presentationTimerIconSpin var(--active-disc-duration,1400ms) linear infinite!important;
+  -webkit-transform-origin:50% 50%;
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+.timer-state-icon.spin .sf-icon,
+.timer-state-icon.spin .custom-active-icon{
+  animation:none!important;
+  -webkit-transform:none!important;
+  transform:none!important;
+}
+
+/* Estado em pausa mais visível. */
+.demo-pause-status{
+  color:#e06a00!important;
+  font-weight:700!important;
+  opacity:1!important;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+.demo-pause-status::before{content:'⚠️';font-size:11px;line-height:1}
+
+/* Hierarquia do modelo selecionado. */
+.model-selected-kicker{opacity:.5!important}
+.model-selected-block .current-model-name{
+  color:color-mix(in srgb,var(--text) 66%,transparent)!important;
+  opacity:1!important;
+  font-weight:620!important;
+}
+
+/* Títulos da barra inferior visíveis no padrão; personalização explícita continua podendo assumir o controle. */
+:root:not(.bottom-bar-lab-enabled) .tabbar{
+  height:max(var(--tabbar-height,50px),58px)!important;
+}
+:root:not(.bottom-bar-lab-enabled) .tabbar button{
+  grid-template-rows:32px 13px!important;
+  align-content:center!important;
+  gap:1px!important;
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+:root:not(.bottom-bar-lab-enabled) .tabbar .sf-icon{
+  width:min(var(--tab-icon,35px),30px)!important;
+  height:min(var(--tab-icon,35px),30px)!important;
+  margin:auto!important;
+}
+:root:not(.bottom-bar-lab-enabled) .tabbar .tab-label{
+  display:block!important;
+  font-size:9.5px!important;
+  line-height:11px!important;
+  font-weight:560!important;
+  text-align:center;
+}
+:root:not(.bottom-bar-lab-enabled) .tabbar button.active .tab-label{font-weight:720!important}
+
+/* Detalhe do registro. */
+.demo-record-head{grid-template-columns:48px minmax(0,1fr) 48px!important}
+.record-detail-heading{
+  color:var(--text)!important;
+  opacity:1!important;
+  font-weight:720!important;
+}
+.record-detail-body{padding-top:3px!important}
+.record-client-line{
+  margin:-2px 18px 0;
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.record-client-profile-link{
+  min-width:0;
+  border:0;
+  background:transparent;
+  color:var(--accent);
+  padding:0;
+  font-size:22px;
+  line-height:27px;
+  font-weight:770;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.record-client-profile-link.is-empty{color:var(--text)}
+.record-client-edit{
+  width:28px;
+  height:28px;
+  flex:0 0 28px;
+  border:0;
+  border-radius:50%;
+  padding:0;
+  display:grid;
+  place-items:center;
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  color:var(--accent);
+}
+.record-client-edit .sf-icon{width:14px;height:14px;stroke-width:2}
+.record-client-more-inline{
+  display:block;
+  width:max-content;
+  max-width:calc(100% - 36px);
+  margin:0 auto 1px;
+  border:0;
+  background:transparent;
+  color:var(--accent);
+  padding:1px 5px;
+  font-size:10.5px;
+  line-height:14px;
+  font-weight:620;
+}
+.demo-record-date{
+  margin:0 auto 8px!important;
+}
+.record-section-label{
+  text-align:center!important;
+  font-weight:700!important;
+}
+.record-detail-divider{
+  height:1px!important;
+  background:color-mix(in srgb,var(--text) 22%,transparent)!important;
+  margin-top:12px!important;
+}
+.record-model-block{
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  padding:1px 0 11px!important;
+}
+.record-model-inline{
+  display:flex;
+  align-items:baseline;
+  justify-content:center;
+  gap:4px;
+  text-align:center;
+  font-size:13px;
+  line-height:18px;
+  color:var(--secondary);
+}
+.record-model-inline strong{
+  color:var(--text);
+  font-size:16px;
+  font-weight:760;
+}
+.record-time-grid{
+  align-items:stretch!important;
+  padding-top:10px!important;
+}
+.record-time-item{
+  border-radius:14px;
+  padding:8px 4px;
+}
+.record-time-working{
+  background:color-mix(in srgb,var(--running) 12%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--running) 24%,transparent);
+}
+.record-time-working span{color:color-mix(in srgb,var(--running) 78%,var(--text))!important;font-weight:680!important}
+.record-time-working strong{
+  color:var(--running)!important;
+  font-size:17px!important;
+  font-weight:800!important;
+}
+
+/* Informações da cliente como cartão expansível com ícone real. */
+.client-info-disclosure.client-info-card{
+  margin:8px 18px 5px!important;
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  box-shadow:0 5px 14px rgba(0,0,0,.035);
+}
+.client-info-disclosure.client-info-card>summary{
+  min-height:42px;
+  padding:9px 12px!important;
+  color:var(--text)!important;
+  font-size:11.5px!important;
+  line-height:15px!important;
+  font-weight:620!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+}
+.client-info-disclosure.client-info-card>summary::after{content:none!important}
+.client-info-disclosure .disclosure-chevron{
+  width:18px!important;
+  height:18px!important;
+  flex:0 0 18px;
+  color:var(--accent);
+  stroke-width:2.2;
+  transition:transform .16s ease;
+}
+.client-info-disclosure[open] .disclosure-chevron{transform:rotate(180deg)}
+.client-info-disclosure.client-info-card .client-info-tongue{
+  border:0!important;
+  border-top:1px solid var(--line)!important;
+  border-radius:0!important;
+  background:color-mix(in srgb,var(--card) 88%,var(--bg))!important;
+  padding:11px 12px 12px!important;
+}
+.client-more-button{display:none!important}
+
+/* Tempos dos cronômetros salvos usam verde, diferenciando-os de ações clicáveis azuis. */
+.demo-record-timers .record-timer-card{
+  border-left-color:var(--running)!important;
+  background:color-mix(in srgb,var(--running) 5%,var(--card))!important;
+}
+.demo-record-timers .record-timer-time,
+.demo-record-timers .record-timer-time .sf-icon,
+.demo-record-timers .record-timer-time strong{
+  color:var(--running)!important;
+}
+
+/* Botões de fechar/concluir maiores nas janelas e folhas. */
+.record-detail-head .record-detail-close,
+.record-detail-check{
+  width:44px!important;
+  height:44px!important;
+  min-width:44px!important;
+  min-height:44px!important;
+}
+.record-detail-head .record-detail-close .sf-icon,
+.record-detail-check .sf-icon{width:21px!important;height:21px!important}
+.modal-wrap button[aria-label="Fechar"],
+.client-profile-wrap button[id^="close"],
+.client-picker-wrap button[id^="close"],
+.notes-editor-wrap button[id^="close"],
+.area-type-wrap button[id^="close"]{
+  min-width:42px!important;
+  min-height:42px!important;
+}
+.client-profile-wrap button[id^="close"] .sf-icon,
+.client-picker-wrap button[id^="close"] .sf-icon,
+.notes-editor-wrap button[id^="close"] .sf-icon,
+.area-type-wrap button[id^="close"] .sf-icon{
+  width:19px!important;
+  height:19px!important;
+}
+
+/* Evolução positiva/negativa em Análises/Estatísticas. */
+.trend-result{
+  display:flex!important;
+  align-items:center;
+  gap:8px;
+  width:max-content;
+  max-width:100%;
+  border-radius:14px;
+  padding:8px 10px;
+  font-weight:780!important;
+}
+.trend-result .trend-icon{width:22px;height:22px;flex:0 0 22px;stroke-width:2.4}
+.trend-positive{
+  color:#248a3d!important;
+  background:rgba(52,199,89,.11);
+}
+.trend-negative{
+  color:#d93025!important;
+  background:rgba(255,59,48,.10);
+}
+.trend-neutral{
+  color:var(--secondary)!important;
+  background:color-mix(in srgb,var(--secondary) 9%,transparent);
+}
+
+/* Backup mais compacto. */
+.backup-alert{
+  min-height:58px!important;
+  grid-template-columns:30px minmax(0,1fr)!important;
+  gap:8px!important;
+  border-radius:18px!important;
+  padding:7px 11px!important;
+  margin-bottom:8px!important;
+}
+.backup-alert-icon{width:26px!important;height:26px!important}
+.backup-alert-icon svg{width:22px!important;height:22px!important}
+.backup-alert-title{font-size:12.5px!important}
+.backup-alert-text{font-size:10px!important;line-height:13px!important}
+.data-backup-card{padding-left:12px!important;padding-right:12px!important}
+.data-backup-row{
+  min-height:50px!important;
+  grid-template-columns:31px minmax(0,1fr) 17px!important;
+  gap:8px!important;
+  padding-top:4px!important;
+  padding-bottom:4px!important;
+}
+.data-backup-row-icon{width:28px!important;height:28px!important}
+.data-backup-row-icon svg{width:24px!important;height:24px!important}
+.data-backup-row-copy{gap:2px!important;padding:7px 0!important}
+.data-backup-row-title{font-size:12.5px!important}
+.data-backup-row-subtitle{font-size:9.7px!important;line-height:12.5px!important}
+.data-backup-chevron,.data-backup-chevron svg{width:16px!important;height:16px!important}
+.data-backup-row+.data-backup-row::before{left:39px!important}
+
+@-webkit-keyframes presentationTimerIconSpin{
+  to{-webkit-transform:rotate(360deg);transform:rotate(360deg)}
+}
+@keyframes presentationTimerIconSpin{
+  to{-webkit-transform:rotate(360deg);transform:rotate(360deg)}
+}
+
+@keyframes presentationBackdropIn{
+  from{opacity:0}
+  to{opacity:1}
+}
+
+@keyframes presentationNoticeIn{
+  from{opacity:0;transform:translate(-50%,-48%) scale(.97)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+
+@media(max-width:420px){
+  .demo-presentation-notice{
+    width:calc(100vw - 28px)!important;
+    padding:19px 45px 18px 18px!important;
+    border-radius:22px!important;
+  }
+  .demo-presentation-notice .presentation-notice-icon{
+    width:40px;
+    height:40px;
+    font-size:23px;
+  }
+  .record-client-profile-link{font-size:20px;line-height:24px}
+  .record-time-grid{gap:4px!important}
+  .record-time-item{padding-left:2px;padding-right:2px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .demo-presentation-backdrop,.demo-presentation-notice{animation:none!important}
+}
