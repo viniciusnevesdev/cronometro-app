@@ -1,11 +1,83 @@
-/* Exclusivo da UZE Beta. Cabeçalhos pertencem ao fluxo da página. */
-.uze-tab-icon{fill:currentColor!important;stroke:none!important;overflow:visible}
-.topbar,.models-header,.section-tab-header{position:relative!important;top:auto!important;min-height:46px!important;padding-top:max(4px,env(safe-area-inset-top))!important;padding-bottom:5px!important}
-.sheet-head{position:relative!important;top:auto!important}
+/* Camada exclusiva da UZE Beta. Componentes compartilhados permanecem nos
+   estilos-base; este arquivo descreve apenas a composição própria da variante. */
+.uze-tab-icon{fill:currentColor;stroke:none;overflow:visible}
+.topbar,.models-header,.section-tab-header{position:relative;top:auto;min-height:46px;padding-top:max(4px,env(safe-area-inset-top));padding-bottom:5px}
+.sheet-head{position:relative;top:auto}
 .uze-beta-version-badge{position:absolute;top:max(4px,env(safe-area-inset-top));right:12px;z-index:2;pointer-events:none;font-size:9px;line-height:1;padding:5px 7px;border-radius:999px;background:rgba(197,106,0,.15);color:#a35700;font-weight:800;letter-spacing:.02em}
-@media (prefers-color-scheme: dark){.uze-beta-version-badge{color:#ffb45d;background:rgba(255,166,54,.17)}}
-.settings-row{min-width:0}.settings-row>span:first-child{white-space:nowrap;font-size:clamp(13px,3.7vw,15px)}
-.settings-v090{padding-top:5px}.theme-mode-card{padding:6px!important}.theme-mode-segment{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px;border-radius:13px;background:var(--bg)}.theme-mode-segment button{min-height:34px;border:0;border-radius:10px;background:transparent;color:var(--secondary);font-size:13px;font-weight:650}.theme-mode-segment button.selected{background:var(--card);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.12)}.settings-version-v090{margin:23px 0 calc(10px + env(safe-area-inset-bottom));text-align:center;color:var(--secondary);font-size:12px}
-.settings-icon-label{display:inline-flex;align-items:center;gap:9px;min-width:0}.settings-icon-label>.sf-icon{width:19px;height:19px;flex:0 0 auto}.settings-icon-label small{display:block;color:var(--secondary);font-size:11px;font-weight:400;margin-top:2px}.current-title{border:1px solid var(--line)!important;border-radius:999px!important;background:transparent!important;padding:4px 10px!important;min-height:28px!important}.data-backup-row{grid-template-columns:36px minmax(0,1fr)!important;padding:0!important}.data-backup-row-copy{width:100%}.history-card{border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line))!important;box-shadow:none!important}
-.notes-editor-body label{display:grid;gap:6px;margin:0 0 14px}.notes-editor-body label>strong{font-size:13px}.notes-editor-body .note-disabled{opacity:.55}.notes-editor-body .note-disabled small{font-size:11px;color:var(--secondary)}
-.theme-mode-segment.two{grid-template-columns:repeat(2,1fr)}.appearance-header~.settings-content .visual-style-section{display:none}
+@media (prefers-color-scheme:dark){.uze-beta-version-badge{color:#ffb45d;background:rgba(255,166,54,.17)}}
+
+.settings-v090{padding-top:5px}
+.uze-settings-heading{margin:0 4px 7px;color:var(--text);font-size:15px;line-height:20px;font-weight:760}
+.uze-mode-section{margin-bottom:13px}
+.uze-segment{--segment-count:3;position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--card);overflow:hidden;isolation:isolate}
+.uze-segment[data-options="2"]{--segment-count:2;grid-template-columns:repeat(2,minmax(0,1fr))}
+.uze-segment::before{content:"";position:absolute;z-index:0;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/var(--segment-count));border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--bg));box-shadow:0 1px 4px rgba(0,0,0,.11);transition:transform .24s cubic-bezier(.22,.8,.24,1)}
+.uze-segment[data-selected="system"]::before,.uze-segment[data-selected="ultra"]::before{transform:translateX(100%)}
+.uze-segment[data-selected="dark"]::before{transform:translateX(200%)}
+.uze-segment button{position:relative;z-index:1;min-width:0;min-height:38px;border:0;border-radius:999px;background:transparent;color:var(--secondary);display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;font-size:13px;font-weight:680;white-space:nowrap}
+.uze-segment button.selected{color:var(--accent)}
+.uze-theme-icon,.uze-segment .uze-line-icon{width:18px;height:18px;flex:0 0 18px}
+.uze-line-icon{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.uze-settings-navigation .settings-row{min-width:0}
+.uze-navigation-row{display:grid;grid-template-columns:minmax(0,1fr) 18px;gap:9px;align-items:center;width:100%}
+.settings-icon-label{display:inline-flex;align-items:center;gap:9px;min-width:0;text-align:left}
+.settings-icon-label>.sf-icon{width:19px;height:19px;flex:0 0 auto}
+.settings-icon-label>span{min-width:0}
+.settings-icon-label strong,.settings-icon-label small{display:block}
+.settings-icon-label small{color:var(--secondary);font-size:11px;font-weight:400;line-height:14px;margin-top:2px;white-space:normal}
+.uze-chevron{color:var(--secondary);font-size:24px;line-height:1;justify-self:end}
+.uze-navigation-copy{min-width:0;text-align:left}
+.settings-version-v090{margin:23px 0 calc(10px + env(safe-area-inset-bottom));text-align:center;color:var(--secondary);font-size:12px}
+
+.current-title{border:1px solid var(--line);border-radius:999px;background:transparent;padding:4px 10px;min-height:28px;max-width:min(62vw,300px)}
+.data-backup-row{grid-template-columns:36px minmax(0,1fr);padding:0}
+.data-backup-row-copy{width:100%;min-width:0}
+.data-backup-row.is-attention{color:#a66312;background:color-mix(in srgb,#ff9f0a 9%,transparent)}
+.data-backup-row.is-attention .data-backup-row-subtitle{color:#a66312}
+.notes-editor-body label{display:grid;gap:6px;margin:0 0 14px}
+.notes-editor-body label>strong{font-size:13px}
+.note-disabled{opacity:.55}
+.note-disabled small{font-size:11px;color:var(--secondary)}
+
+.uze-active-icon-summary{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:center;gap:12px;padding:12px 14px}
+.uze-active-icon-preview{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 9%,var(--bg));color:var(--accent)}
+.uze-active-icon-preview .sf-icon,.uze-active-icon-preview img{width:32px;height:32px;object-fit:contain}
+.uze-active-icon-summary>span:last-child{display:grid;gap:3px;min-width:0}
+.uze-active-icon-summary small{color:var(--secondary);font-size:11px}
+.uze-option-row{display:grid;gap:8px}
+.uze-option-row>span{font-size:13px;font-weight:680}
+
+.uze-client-search{height:44px;margin:0 0 10px;border:1px solid var(--line);border-radius:14px;background:var(--card);display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:7px;padding:0 12px;color:var(--secondary)}
+.uze-client-search .sf-icon{width:19px;height:19px}
+.uze-client-search input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--text);font:inherit}
+.uze-create-client{width:100%;min-height:42px;margin-bottom:12px;border:0;border-radius:14px;background:color-mix(in srgb,var(--accent) 11%,var(--card));color:var(--accent);display:flex;align-items:center;justify-content:center;gap:7px;font-weight:720}
+.uze-create-client .sf-icon,.uze-header-action .sf-icon{width:19px;height:19px}
+.uze-header-action{width:36px;height:36px;border:0;border-radius:50%;background:color-mix(in srgb,var(--accent) 11%,transparent);color:var(--accent);display:grid;place-items:center}
+.uze-client-profile .client-profile-head{display:grid;grid-template-columns:72px minmax(0,1fr) 38px;align-items:center;gap:6px}
+.uze-client-profile .client-profile-head h2{margin:0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uze-profile-edit{border:0;background:transparent;color:var(--accent);display:flex;align-items:center;gap:3px;font-size:12px}
+.uze-profile-edit .sf-icon{width:15px;height:15px}
+.uze-client-history-row{width:100%;min-height:42px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+.uze-client-history-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uze-client-history-row strong{flex:0 0 auto;color:var(--secondary);font-size:12px}
+.uze-delete-client{width:100%;min-height:42px;margin-top:15px;border:0;border-radius:13px;background:color-mix(in srgb,#ff3b30 9%,transparent);color:#d93025;font-weight:700}
+
+.uze-model-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.uze-model-actions .detail-action{min-width:0;min-height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;font-size:12.5px;line-height:15px;white-space:nowrap}
+.uze-model-actions .sf-icon{width:17px;height:17px;flex:0 0 17px}
+.notes-detail-card .note-disabled small{display:block;margin-top:5px;line-height:14px}
+.marker-editor-actions #clearTimerMarker{color:var(--secondary)}
+
+@media (max-width:390px){
+  .uze-segment button{font-size:12px;gap:5px;padding:0 5px}
+  .uze-theme-icon,.uze-segment .uze-line-icon{width:17px;height:17px;flex-basis:17px}
+  .uze-model-actions .detail-action{font-size:12px;padding-inline:5px}
+}
+@media (max-width:374px){
+  .uze-model-actions .detail-action{font-size:11.5px;gap:4px}
+  .settings-icon-label small{font-size:10.5px}
+}
+@media (min-width:700px){
+  .uze-mode-section,.uze-settings-navigation,.data-backup-card{max-width:680px;margin-left:auto;margin-right:auto}
+}

@@ -24,7 +24,8 @@
     clock:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     gauge:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="m12 13 4-4"/><path d="M7 17h10"/></svg>',
     pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
-    layers:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></svg>'
+    layers:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></svg>',
+    compass:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/></svg>'
   }[name] || '');
 
   function rangeBounds(days, offset=0,anchor=now()){
@@ -137,8 +138,9 @@
   }
 
   function newClientsMarkup(bounds,days){
-    const clients=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&Number.isFinite(Number(c.createdAt))&&Number(c.createdAt)>=bounds.start&&Number(c.createdAt)<=bounds.end);
-    const prev=rangeBounds(days,1,bounds.end),previous=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&Number.isFinite(Number(c.createdAt))&&Number(c.createdAt)>=prev.start&&Number(c.createdAt)<=prev.end).length;
+    const hasRealCreatedAt=c=>c?.createdAt!=null&&Number.isFinite(Number(c.createdAt));
+    const clients=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&hasRealCreatedAt(c)&&Number(c.createdAt)>=bounds.start&&Number(c.createdAt)<=bounds.end);
+    const prev={start:bounds.start-days*86400000,end:bounds.start-1},previous=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&hasRealCreatedAt(c)&&Number(c.createdAt)>=prev.start&&Number(c.createdAt)<=prev.end).length;
     const current=clients.length;let comparison='Sem base anterior para porcentagem',tone='neutral';if(previous){const pct=(current-previous)/previous*100;tone=pct>0?'positive':pct<0?'negative':'neutral';comparison=`${pct>0?'+':''}${pct.toFixed(1).replace('.',',')}% · comparado aos ${days} dias imediatamente anteriores`;}
     return `<div class="analytics-new-clients trend-${tone}"><strong>${current}</strong><span>clientes novas</span><small>${comparison}</small></div>`;
   }
@@ -170,31 +172,32 @@
       <main class="content analytics-content">
         <section class="analytics-controls" aria-label="Filtros das estatísticas">
           <div class="analytics-range-segment">${RANGE_OPTIONS.map(d=>`<button data-analytics-range="${d}" class="${days===d?'selected':''}">${d===365?'1 ano':`${d} dias`}</button>`).join('')}</div>
-          <select id="analyticsModelFilter"><option value="all">Todos os modelos</option>${models.map(m=>`<option value="${esc(m.id)}" ${ui.analyticsModelId===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
+          <label class="analytics-model-control"><span>Base das estatísticas</span><select id="analyticsModelFilter"><option value="all">Todos os modelos</option>${models.map(m=>`<option value="${esc(m.id)}" ${ui.analyticsModelId===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
         </section>
 
         ${!current.length?`<div class="empty analytics-empty">Nenhum atendimento medido nos ${esc(rangeLabel)}.</div>`:`
           <section class="analytics-hero trend-${trend.tone}">
             <div class="analytics-hero-icon">${analyticsIcon(toneIcon)}</div>
-            <div><small>Evolução do tempo médio</small><strong>${esc(trend.label)}</strong><span>${esc(comparisonNote)}</span></div>
+            <div><small>Evolução do tempo médio · ${esc(rangeLabel)}</small><strong>${esc(trend.label)}</strong><span>${esc(comparisonNote)}</span></div>
           </section>
 
-          <section class="analytics-kpi-grid">
+          ${analyticsCard('Número de atendimentos',modelBreakdownMarkup(currentVisits),'analytics-chart-card',rangeLabel)}
+
+          <small class="analytics-section-period">${esc(rangeLabel)}</small><section class="analytics-kpi-grid">
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('clock')}</span><small>Tempo médio</small><strong>${fmtDuration(avg)}</strong><em>${current.length} atendimento${current.length===1?'':'s'} medido${current.length===1?'':'s'} no período</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('gauge')}</span><small>Tempo típico</small><strong>${fmtDuration(med)}</strong><em>mediana · menos sensível a extremos</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('stable')}</span><small>Consistência</small><strong>${consistency.toFixed(0)}%</strong><em>${consistency>=80?'bem estável':consistency>=60?'variação moderada':'alta variação'} entre serviços iguais</em></article>
             <article class="analytics-kpi"><span class="analytics-kpi-icon">${analyticsIcon('pause')}</span><small>Pausas</small><strong>${pauseRatio.toFixed(1).replace('.',',')}%</strong><em>do tempo bruto registrado</em></article>
           </section>
 
-          ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
-          ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
-          ${ui.analyticsModelId==='all'?analyticsCard('Número de atendimentos',modelBreakdownMarkup(current),'analytics-chart-card',rangeLabel):''}
+          ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card',rangeLabel)}
+          ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card',rangeLabel)}
           ${analyticsCard('Clientes novas',newClientsMarkup(currentBounds,days),'analytics-client-card',rangeLabel)}
           ${analyticsCard('Cliente que você mais leva tempo',clientTimeExtremes(current,'max'),'analytics-client-card',rangeLabel)}
           ${analyticsCard('Cliente que você leva menos tempo',clientTimeExtremes(current,'min'),'analytics-client-card',rangeLabel)}
           ${analyticsCard('Onde seu tempo está indo',`<p class="analytics-card-description">Mostra as etapas com maior tempo médio entre os atendimentos selecionados.</p>${bottleneckMarkup(current)}`,'analytics-chart-card',rangeLabel)}
 
-          <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
+          <details class="analytics-global-card"><summary><span>${analyticsIcon('compass')}<strong>Estatísticas globais</strong></span><small>Estatísticas totais desde o dia em que você começou a usar o app</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
         `}
       </main>`,'stats');
   }
@@ -212,9 +215,10 @@
   if(baseBindV082Events){
     bindV082Events = function(){
       baseBindV082Events();
-      document.querySelectorAll('[data-analytics-range]').forEach(b=>b.onclick=()=>{const y=window.scrollY;ui.analyticsRangeDays=Number(b.dataset.analyticsRange);render();requestAnimationFrame(()=>window.scrollTo(0,y));});
+      const rerenderAtSameScroll=change=>{const scroller=document.scrollingElement||document.documentElement,y=scroller.scrollTop;change();render();requestAnimationFrame(()=>requestAnimationFrame(()=>{scroller.scrollTop=y;}));};
+      document.querySelectorAll('[data-analytics-range]').forEach(b=>b.onclick=()=>rerenderAtSameScroll(()=>{ui.analyticsRangeDays=Number(b.dataset.analyticsRange);}));
       const modelFilter=document.getElementById('analyticsModelFilter');
-      if(modelFilter)modelFilter.onchange=()=>{const y=window.scrollY;ui.analyticsModelId=modelFilter.value;render();requestAnimationFrame(()=>window.scrollTo(0,y));};
+      if(modelFilter)modelFilter.onchange=()=>rerenderAtSameScroll(()=>{ui.analyticsModelId=modelFilter.value;});
     };
   }
 

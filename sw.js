@@ -1,5 +1,6 @@
 'use strict';
 const CACHE='cronometro-public-presentation-0.8.10-8';
+const CACHE_PREFIX='cronometro-public-presentation-';
 const ASSETS=[
   './',
   './index.html',
@@ -28,7 +29,7 @@ self.addEventListener('install',event=>{
 
 self.addEventListener('activate',event=>{
   event.waitUntil(Promise.all([
-    caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('cronometro-public-demo-')||key.startsWith('cronometro-public-presentation-'))&&key!==CACHE).map(key=>caches.delete(key)))),
+    caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('cronometro-public-demo-')||key.startsWith(CACHE_PREFIX))&&key!==CACHE).map(key=>caches.delete(key)))),
     self.clients.claim()
   ]));
 });

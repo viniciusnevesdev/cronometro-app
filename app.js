@@ -2849,7 +2849,6 @@ function bindV082Events(){
   const cn=byId('currentClientNote');if(cn){autoGrowTextarea(cn);cn.oninput=e=>{autoGrowTextarea(e.target);data.current.clientNote=e.target.value;clearTimeout(cn._tm);cn._tm=setTimeout(()=>persistCurrent(),180);};}
   if(byId('openAdvancedSettings'))byId('openAdvancedSettings').onclick=()=>{ui.settingsView='advanced';render();};
   if(byId('closeAdvancedSettings'))byId('closeAdvancedSettings').onclick=()=>{ui.settingsView='appearance';render();};
-  if(byId('editClientEmptyLabel'))byId('editClientEmptyLabel').onclick=async()=>{const raw=await iosTextPrompt({title:'Texto sem cliente',message:'Esse texto aparece quando nenhum cliente estiver vinculado.',value:data.settings.clientEmptyLabel||'Sem cliente',placeholder:'Sem cliente'});const v=String(raw??'').trim();if(v){data.settings.clientEmptyLabel=v;await persistSettings();render();}};
   document.querySelectorAll('[data-change-area-type]').forEach(b=>b.onclick=()=>{const a=areaById(b.dataset.changeAreaType);ui.modal={type:'areaTypeExisting',areaId:a.id,pendingAreaName:a.name};render();});
   if(byId('modelAreaSelect'))byId('modelAreaSelect').onchange=async e=>{const m=modelById(ui.modal?.id);if(!m)return;m.areaId=e.target.value;m.updatedAt=now();await put('models',m);if(data.current?.modelId===m.id){data.current.areaId=m.areaId;await persistCurrent();data.settings.activeAreaId=m.areaId;await persistSettings();}render();};
   const rangeBind=(id,key,div=100)=>{const el=byId(id);if(!el)return;el.oninput=e=>{data.settings[key]=Number(e.target.value)/div;applyTheme();const label=e.target.closest('.advanced-setting')?.querySelector('.advanced-setting-head span:last-child');if(label)label.textContent=`${e.target.value}%`;};el.onchange=async()=>persistSettings();};
@@ -3057,7 +3056,7 @@ async function exportJSON(){
 }
 ;
 
-/* v0.8.8 — modo Clássico / Ultra Visual */
+/* v0.8.8 — modo Otimizado / Ultra Visual */
 globalThis.APP_META=Object.freeze({version:'0.8.8',dataSchemaVersion:5,factoryDataVersion:1});
 
 function visualStyleModeV088(){
@@ -3071,7 +3070,7 @@ function visualStyleSettingsBlockV088(){
   return `<section class="settings-section visual-style-section"><h3 class="section-label">Estilo visual</h3><div class="settings-card visual-style-card">
     <div class="visual-style-intro">Escolha entre o visual atual, mais leve, e a camada Ultra com Glow, vidro e cor suave.</div>
     <div class="visual-style-picker" role="group" aria-label="Estilo visual do aplicativo">
-      <button class="visual-style-option ${mode==='classic'?'selected':''}" data-visual-style-mode="classic" aria-pressed="${mode==='classic'}"><span class="visual-style-option-head"><span class="visual-style-swatch"></span><span>Clássico</span></span><small>Mais leve e otimizado.</small><span class="visual-style-chip">PADRÃO</span></button>
+      <button class="visual-style-option ${mode==='classic'?'selected':''}" data-visual-style-mode="classic" aria-pressed="${mode==='classic'}"><span class="visual-style-option-head"><span class="visual-style-swatch"></span><span>Otimizado</span></span><small>Mais leve e otimizado.</small><span class="visual-style-chip">PADRÃO</span></button>
       <button class="visual-style-option ${mode==='ultra'?'selected':''}" data-visual-style-mode="ultra" aria-pressed="${mode==='ultra'}"><span class="visual-style-option-head"><span class="visual-style-swatch ultra"></span><span>Ultra</span></span><small>Glow, transparência e profundidade.</small><span class="visual-style-chip">FANCY</span></button>
     </div>
     <div class="visual-style-footnote">O app sempre inicia pela camada Clássica. Se Ultra estiver selecionado, os efeitos entram logo depois da abertura para reduzir o risco de travamentos.</div>
@@ -3252,7 +3251,7 @@ function legacyClientLinkSessionV089(session,{models,settings,clients,index,lega
   if(!client){
     const t=typeof now==='function'?now():Date.now();
     const idPart=typeof uid==='function'?uid():`${t}-${Math.random().toString(36).slice(2)}`;
-    client={id:`client-${idPart}`,areaId,name,aliases:[],createdAt:t,updatedAt:t,deletedAt:null};
+    client={id:`client-${idPart}`,areaId,name,aliases:[],createdAt:null,migratedAt:t,updatedAt:t,deletedAt:null};
     clients.push(client);index.set(key,client);created=true;
   }
 
@@ -3481,16 +3480,6 @@ renderSettings=function(){
   if(ui.settingsView!=='main')return __renderSettingsBeforeDemo();
   const soundStatus=data.settings.timerSoundEnabled?(data.settings.timerSoundData?'Ativado':'Sem áudio'):'Desativado';
   return shell(`<header class="topbar simple section-tab-header demo-tab-header"><div class="section-profile-head">${activeAreaBadge()}<h1>Ajustes</h1></div></header><main class="settings-content demo-settings-main"><section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row demo-clients-entry" id="openClientsDirectory"><span>${personIconMarkup()}<strong>Clientes cadastradas</strong></span><span class="secondary-value">Ver lista ›</span></button></div></section>${themeModeCardDemo()}<section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openSoundSettings"><span class="settings-icon-label">${speakerIconDemo()}<span>Som do cronômetro</span></span><span class="secondary-value">${esc(soundStatus)} ›</span></button></div></section>${areaSettingsDemo()}<section class="settings-section"><h3 class="section-label">Personalização</h3><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openAppearanceSettings"><span>Aparência e personalização</span><span class="secondary-value">›</span></button></div></section>${renderDataBackupSectionV087()}<section class="settings-section"><div class="settings-card"><div class="settings-row"><span>Versão</span><span class="secondary-value">${esc(APP_META.version)}</span></div></div></section></main>`,'settings');
-};
-
-/* Move o texto sem cliente para Aparência / Personalização. */
-const __renderAppearanceBeforeDemo=renderAppearanceSettings;
-renderAppearanceSettings=function(){
-  let html=__renderAppearanceBeforeDemo();
-  const marker='<main class="settings-content">';
-  const block=`<section class="settings-section"><h3 class="section-label">Clientes</h3><div class="settings-card"><button class="settings-row button-row" id="editClientEmptyLabel"><span>Texto quando não houver cliente</span><span class="secondary-value">${esc(data.settings.clientEmptyLabel||'selecionar cliente')}</span></button></div></section>`;
-  if(html.includes(marker))html=html.replace(marker,marker+block);
-  return html;
 };
 
 function dedupeTextDemo(list){

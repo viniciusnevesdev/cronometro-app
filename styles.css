@@ -667,8 +667,8 @@ button:disabled{opacity:.28;cursor:default}
 /* Histórico — cor importante no ícone e no tempo, sem aparência de play/pause */
 .history-card{
   border-radius:22px;
-  border-left:3px solid color-mix(in srgb,var(--accent) 72%,transparent);
-  padding-left:15px;
+  border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));
+  padding-left:16px;
 }
 .history-total{color:var(--accent)}
 .history-total .sf-icon{color:var(--accent)}
@@ -1586,9 +1586,9 @@ body{font-size:15px}
 .demo-area-copy{display:grid;gap:2px;min-width:0}.demo-area-copy strong{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.demo-area-copy small{font-size:10px;color:var(--secondary)}
 .demo-area-actions{display:flex;gap:4px}.demo-area-actions button{border:0;background:color-mix(in srgb,var(--secondary) 9%,transparent);color:var(--accent);padding:6px 7px;border-radius:9px;font-size:10px}.demo-area-actions button.danger{color:var(--delete-fixed)}
 .demo-add-area{width:100%;border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:650;padding:10px 5px 4px;text-align:center}
-.data-backup-card{border-radius:20px!important}
-.data-backup-row{min-height:58px!important;padding-top:7px!important;padding-bottom:7px!important}
-.data-backup-row-title{font-size:13.5px!important}.data-backup-row-subtitle{font-size:10.5px!important;line-height:14px!important}
+.data-backup-card{border-radius:20px}
+.data-backup-row{min-height:58px;padding-top:7px;padding-bottom:7px}
+.data-backup-row-title{font-size:13.5px}.data-backup-row-subtitle{font-size:10.5px;line-height:14px}
 .data-export-other .settings-row{min-height:45px!important}
 .backup-alert{padding-top:10px!important;padding-bottom:10px!important}
 

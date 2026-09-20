@@ -364,19 +364,19 @@
 .backup-alert-text{font-size:10px!important;line-height:13px!important}
 .data-backup-card{padding-left:12px!important;padding-right:12px!important}
 .data-backup-row{
-  min-height:50px!important;
-  grid-template-columns:31px minmax(0,1fr) 17px!important;
-  gap:8px!important;
-  padding-top:4px!important;
-  padding-bottom:4px!important;
+  min-height:50px;
+  grid-template-columns:31px minmax(0,1fr) 17px;
+  gap:8px;
+  padding-top:4px;
+  padding-bottom:4px;
 }
-.data-backup-row-icon{width:28px!important;height:28px!important}
-.data-backup-row-icon svg{width:24px!important;height:24px!important}
-.data-backup-row-copy{gap:2px!important;padding:7px 0!important}
-.data-backup-row-title{font-size:12.5px!important}
-.data-backup-row-subtitle{font-size:9.7px!important;line-height:12.5px!important}
-.data-backup-chevron,.data-backup-chevron svg{width:16px!important;height:16px!important}
-.data-backup-row+.data-backup-row::before{left:39px!important}
+.data-backup-row-icon{width:28px;height:28px}
+.data-backup-row-icon svg{width:24px;height:24px}
+.data-backup-row-copy{gap:2px;padding:7px 0}
+.data-backup-row-title{font-size:12.5px}
+.data-backup-row-subtitle{font-size:9.7px;line-height:12.5px}
+.data-backup-chevron,.data-backup-chevron svg{width:16px;height:16px}
+.data-backup-row+.data-backup-row::before{left:39px}
 
 @-webkit-keyframes presentationTimerIconSpin{
   to{-webkit-transform:rotate(360deg);transform:rotate(360deg)}
