@@ -7,7 +7,7 @@
   },
   "beta": {
     "environment": "uze-beta",
-    "release": "0.8.11-beta.3",
+    "release": "0.8.11-beta.4",
     "database": "cronometro_uze_beta_v1",
     "cachePrefix": "cronometro-uze-beta-"
   }

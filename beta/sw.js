@@ -1,14 +1,17 @@
 'use strict';
-const CACHE='cronometro-uze-beta-0.8.11-beta.3';
+const CACHE='cronometro-uze-beta-0.8.11-beta.4';
+const CACHE_PREFIX='cronometro-uze-beta-';
 const ASSETS=[
   './',
   './index.html',
   './styles.css',
   './presentation.css',
   './analytics.css',
+  './uze-beta.css',
   './app.js',
   './presentation-ui.js',
   './analytics-ui.js',
+  './uze-beta.js',
   './presentation.js',
   './initial-data.json',
   './manifest.webmanifest',
@@ -28,7 +31,7 @@ self.addEventListener('install',event=>{
 
 self.addEventListener('activate',event=>{
   event.waitUntil(Promise.all([
-    caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('cronometro-public-demo-')||key.startsWith('cronometro-public-presentation-'))&&key!==CACHE).map(key=>caches.delete(key)))),
+    caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('cronometro-public-demo-')||key.startsWith(CACHE_PREFIX))&&key!==CACHE).map(key=>caches.delete(key)))),
     self.clients.claim()
   ]));
 });

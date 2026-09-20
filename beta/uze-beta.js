@@ -5,21 +5,37 @@
 (() => {
   const RELEASE=String(window.APP_RELEASE||'');
   const UZE_AREA='principal';
-  const excluded=new Set(['teste','treino','modelo novo','novo modelo','sem título','sem cliente']);
+  const excluded=new Set(['teste','treino','sem titulo','sem cliente','manutencao','alongamento','modelo novo','novo modelo','molde','f1','aula','cliente','atendimento']);
   const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
   const clearlyLegacyClientName=value=>{
     const name=String(value||'').trim().replace(/\s+/g,' ');
-    if(!name||name.length<5||name.length>80||excluded.has(normalize(name)))return false;
+    if(!name||name.length<3||name.length>80||excluded.has(normalize(name)))return false;
     const parts=name.split(' ');
-    // Conservador: dois a quatro nomes próprios, só letras e cada palavra
-    // iniciada por maiúscula. "teste" e títulos operacionais ficam intactos.
-    return parts.length>=2&&parts.length<=4&&parts.every(part=>/^[A-ZÀ-Ý][A-Za-zÀ-ÿ'-]{1,}$/.test(part));
+    // Conservador: um a cinco nomes próprios, apenas letras, sem termos
+    // operacionais. Permite nomes curtos reais como "Ana".
+    return parts.length<=5&&parts.every(part=>/^[A-ZÀ-Ý][A-Za-zÀ-ÿ'-]{1,}$/.test(part));
   };
+
+  async function uzeSeedClients(){
+    try{
+      const response=await fetch('./initial-data.json',{cache:'no-store'});
+      if(!response.ok)return [];
+      const seed=await response.json();
+      return Array.isArray(seed?.settings?.clients)?seed.settings.clients:[];
+    }catch(error){console.warn('Não foi possível consultar clientes do seed UZE.',error);return [];}
+  }
 
   async function migrateUzeNativeClients(){
     if(typeof data==='undefined'||typeof db==='undefined')return;
     let settingsChanged=false,currentChanged=false;
     const clients=Array.isArray(data.settings.clients)?data.settings.clients.slice():[];
+    const seedClients=await uzeSeedClients();
+    const referencedIds=new Set([...data.sessions,data.current].filter(Boolean).map(session=>session.clientId).filter(Boolean));
+    for(const seedClient of seedClients){
+      if(!seedClient?.id||!referencedIds.has(seedClient.id)||clients.some(client=>client?.id===seedClient.id))continue;
+      clients.push({...clone(seedClient),areaId:UZE_AREA});
+      settingsChanged=true;
+    }
     const byName=new Map();
     for(const client of clients){
       if(!client||client.deletedAt||!client.name)continue;
@@ -29,7 +45,9 @@
     const findOrCreate=async name=>{
       const key=normalize(name);let client=byName.get(key);
       if(client)return client;
-      client={id:`client-${uid()}`,areaId:UZE_AREA,name,createdAt:now(),updatedAt:now(),deletedAt:null};
+      // createdAt nulo é intencional: um vínculo legado não prova a data real
+      // de cadastro e não deve contaminar a métrica de clientes novas.
+      client={id:`client-${uid()}`,areaId:UZE_AREA,name,createdAt:null,migratedAt:now(),updatedAt:now(),deletedAt:null,aliases:[]};
       clients.push(client);byName.set(key,client);settingsChanged=true;
       return client;
     };
@@ -44,13 +62,16 @@
       if(!Object.prototype.hasOwnProperty.call(session,'clientId')){session.clientId=null;changed=true;}
       if(typeof session.clientNameSnapshot!=='string'){session.clientNameSnapshot='';changed=true;}
       // Preserva title: o vínculo é aditivo e reversível via backup.
-      const legacyName=clearlyLegacyClientName(session.title)?String(session.title).trim():(clearlyLegacyClientName(session.clientNameSnapshot)?String(session.clientNameSnapshot).trim():'');
-      if(!session.clientId&&legacyName){
+      const linked=clients.find(client=>client?.id===session.clientId&&!client.deletedAt);
+      const snapshotName=clearlyLegacyClientName(session.clientNameSnapshot)?String(session.clientNameSnapshot).trim():'';
+      const titleName=clearlyLegacyClientName(session.title)?String(session.title).trim():'';
+      const legacyName=snapshotName||titleName;
+      if(!linked&&legacyName){
         const client=await findOrCreate(legacyName);
+        if(titleName&&!session.legacyTitle)session.legacyTitle=session.title;
         session.clientId=client.id;session.clientNameSnapshot=client.name;changed=true;
-      }else if(session.clientId){
-        const client=clients.find(c=>c?.id===session.clientId);
-        if(client&&!session.clientNameSnapshot){session.clientNameSnapshot=client.name;changed=true;}
+      }else if(linked&&!session.clientNameSnapshot){
+        session.clientNameSnapshot=linked.name;changed=true;
       }
       if(changed)await put('sessions',session);
     }
@@ -58,13 +79,18 @@
       if(data.current.areaId!==UZE_AREA){data.current.areaId=UZE_AREA;currentChanged=true;}
       if(!Object.prototype.hasOwnProperty.call(data.current,'clientId')){data.current.clientId=null;currentChanged=true;}
       if(typeof data.current.clientNameSnapshot!=='string'){data.current.clientNameSnapshot='';currentChanged=true;}
-      if(!data.current.clientId&&clearlyLegacyClientName(data.current.title)){
-        const client=await findOrCreate(String(data.current.title).trim());
+      const currentLinked=clients.find(client=>client?.id===data.current.clientId&&!client.deletedAt);
+      const currentSnapshot=clearlyLegacyClientName(data.current.clientNameSnapshot)?String(data.current.clientNameSnapshot).trim():'';
+      const currentTitle=clearlyLegacyClientName(data.current.title)?String(data.current.title).trim():'';
+      if(!currentLinked&&(currentSnapshot||currentTitle)){
+        const client=await findOrCreate(currentSnapshot||currentTitle);
+        if(currentTitle&&!data.current.legacyTitle)data.current.legacyTitle=data.current.title;
         data.current.clientId=client.id;data.current.clientNameSnapshot=client.name;currentChanged=true;
       }
     }
     if(!Array.isArray(data.settings.clients)||JSON.stringify(data.settings.clients)!==JSON.stringify(clients)){data.settings.clients=clients;settingsChanged=true;}
     if(data.settings.activeAreaId!==UZE_AREA){data.settings.activeAreaId=UZE_AREA;settingsChanged=true;}
+    if(data.settings.clientEmptyLabel!=='Escolher cliente'){data.settings.clientEmptyLabel='Escolher cliente';settingsChanged=true;}
     if(settingsChanged)await persistSettings();
     if(currentChanged)await persistCurrent();
   }
@@ -77,18 +103,160 @@
   };
   const baseSvg=svgIcon;
   svgIcon=name=>tabSvg[name]||baseSvg(name);
-  renderNotesEditor=function(sessionId){const s=data.sessions.find(x=>x.id===sessionId);if(!s)return '';const linked=!!s.clientId;return `<div class="notes-editor-wrap"><section class="notes-editor-card"><div class="notes-editor-head"><h2>Notas</h2><button class="notes-editor-close" id="closeNotesEditor">${svgIcon('close')}</button></div><div class="notes-editor-body"><label><strong>Sobre o atendimento</strong><textarea id="editAppointmentNote">${esc(s.appointmentNote||s.note||'')}</textarea></label><label class="${linked?'':'note-disabled'}"><strong>Sobre a cliente</strong><textarea id="editClientNote" ${linked?'':'disabled'}>${esc(s.clientNote||'')}</textarea>${linked?'':'<small>Vincule uma cliente para adicionar notas sobre ela.</small>'}</label></div><button class="notes-editor-save" id="saveNotesEditor">Salvar anotações</button></section></div>`;};
-  const baseSettings=renderSettings;
-  const baseAppearance=renderAppearanceSettings;
-  function renderUzeActiveIcon(){const sizes=Object.values(UI_CONFIG.activeIconSizes||{}),speeds=Object.values(UI_CONFIG.animationSpeeds||{});return shell(`<header class="topbar simple section-tab-header"><button class="appearance-back" id="closeUzeActiveIcon">${svgIcon('back')}</button><h1>Ícone do cronômetro ativo</h1><span></span></header><main class="settings-content"><section class="settings-section"><div class="settings-card"><label class="settings-row button-row" for="activeIconFile"><span>Escolher SVG ou PNG</span><input id="activeIconFile" class="sr-only" type="file" accept="image/svg+xml,image/png,.svg,.png"></label><button class="settings-row button-row" id="pasteSvgCode"><span>Colar código SVG</span></button><button class="settings-row button-row" id="pasteSvgUrl"><span>Colar link SVG</span></button>${data.settings.activeTimerIconSource!=='default'?'<button class="settings-row button-row" id="restoreDefaultActiveIcon"><span>Restaurar padrão</span></button>':''}</div></section><section class="settings-section"><h3 class="section-label">Visual</h3><div class="settings-card"><div class="settings-row animation-speed-row"><span>Tamanho</span><div class="animation-speed-options">${sizes.map(x=>`<button data-active-icon-size="${x.id}" class="${data.settings.activeTimerIconSize===x.id?'selected':''}">${x.name}</button>`).join('')}</div></div><button class="settings-row button-row" id="toggleActiveTimerAnimation"><span>Animar ícone</span><span class="ios-switch ${data.settings.animateActiveTimerIcon?'on':''}"></span></button>${data.settings.animateActiveTimerIcon?`<div class="settings-row animation-speed-row"><span>Velocidade</span><div class="animation-speed-options">${speeds.map(x=>`<button data-animation-speed="${x.id}" class="${data.settings.activeTimerAnimationSpeed===x.id?'selected':''}">${x.name}</button>`).join('')}</div></div>`:''}</div></section></main>`);}
-  renderAppearanceSettings=function(){if(ui.settingsView==='uzeActiveIcon')return renderUzeActiveIcon();const html=baseAppearance();const start=html.indexOf('<section class="settings-section"><h3 class="section-label">Ícone do cronômetro ativo');const end=html.indexOf('<section class="settings-section"><h3 class="section-label">Avançado',start);if(start<0||end<0)return html;return html.slice(0,start)+'<section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row" id="openUzeActiveIcon"><span>Ícone do cronômetro ativo</span><span class="secondary-value">›</span></button></div></section>'+html.slice(end);};
-  renderSettings=function(){
-    if(ui.settingsView==='sound'||ui.settingsView==='appearance'||ui.settingsView==='advanced'||ui.settingsView==='clients'||ui.settingsView==='uzeActiveIcon')return baseSettings();
-    const theme=data.settings.theme||'system',release=String(window.APP_RELEASE||''),visual=visualStyleModeV088();
-    const note='<svg class="sf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>';
-    const person=personIconMarkup();
-    return shell(`<header class="topbar section-tab-header"><h1>Ajustes</h1></header><main class="settings-content settings-v090"><section class="settings-section"><h3 class="section-label">Tema</h3><div class="settings-card theme-mode-card"><div class="theme-mode-segment">${[['light','☀ Claro'],['system','▣ Sistema'],['dark','☾ Escuro']].map(([id,label])=>`<button data-uze-theme="${id}" class="${theme===id?'selected':''}">${label}</button>`).join('')}</div></div></section><section class="settings-section"><div class="settings-card theme-mode-card"><div class="theme-mode-segment two">${[['classic','◻ Otimizado'],['ultra','✦ Ultra']].map(([id,label])=>`<button data-visual-style-mode="${id}" class="${visual===id?'selected':''}">${label}</button>`).join('')}</div></div></section><section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row demo-clients-entry" id="openClientsDirectory"><span class="settings-icon-label">${person}<span><strong>Clientes</strong><small>Cadastrar e gerenciar clientes</small></span></span><span class="secondary-value">›</span></button><button class="settings-row button-row" id="openSoundSettings"><span class="settings-icon-label">${note}<span>Som do cronômetro</span></span><span class="secondary-value">${data.settings.timerSoundEnabled?'Ativado':'Desativado'} ›</span></button><button class="settings-row button-row" id="openAppearanceSettings"><span>Aparência</span><span class="secondary-value">Visual, ícones e detalhes ›</span></button></div></section><section class="settings-section"><h3 class="section-label">Dados</h3><div class="data-backup-card"><button class="data-backup-row" id="exportJson"><span class="data-backup-row-icon">${backupShareIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Exportar backup</strong><span class="data-backup-row-subtitle">${data.settings.lastBackupExportAt?'Último backup registrado':'Nenhum backup registrado'}</span></span></button><label class="data-backup-row" for="importJsonFile"><span class="data-backup-row-icon">${backupImportIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Restaurar backup</strong><span class="data-backup-row-subtitle">Substitui os dados atuais pelo backup JSON</span></span><input id="importJsonFile" class="sr-only" type="file" accept="application/json,.json"></label></div></section><section class="settings-section"><h3 class="section-label">Outros formatos</h3><div class="settings-card"><button class="settings-row button-row" id="exportCsv"><span>Exportar CSV</span></button><button class="settings-row button-row" id="exportPdf"><span>Exportar PDF</span></button></div></section><p class="settings-version-v090">Versão ${release}</p></main>`);
+  const lineIcon=paths=>`<svg class="sf-icon uze-line-icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+  const uzeIcons={
+    note:lineIcon('<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>'),
+    appearance:lineIcon('<path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/>'),
+    optimized:lineIcon('<path d="M5 12h14"/><path d="M12 5v14"/><circle cx="12" cy="12" r="8"/>'),
+    ultra:lineIcon('<path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="m18.5 16 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/>'),
+    reorder:lineIcon('<path d="M8 6h12"/><path d="M8 12h12"/><path d="M8 18h12"/><path d="m3 5 2-2 2 2"/><path d="M5 3v16"/><path d="m3 17 2 2 2-2"/>'),
+    duplicate:lineIcon('<rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'),
+    search:lineIcon('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'),
+    compass:lineIcon('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/>')
   };
+  const themeIcon=mode=>mode==='light'
+    ?'<svg class="uze-theme-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
+    :mode==='dark'
+      ?'<svg class="uze-theme-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="currentColor"/></svg>'
+      :'<svg class="uze-theme-icon" viewBox="0 0 20 20" aria-hidden="true"><defs><clipPath id="uze-system-half"><path d="M3 17 17 3H3Z"/></clipPath></defs><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="10" r="6.5" fill="currentColor" clip-path="url(#uze-system-half)"/></svg>';
+
+  clientLabelForSession=function(session){
+    if(!session)return 'Escolher cliente';
+    return clientById(session.clientId)?.name||session.clientNameSnapshot||'Escolher cliente';
+  };
+
+  renderNotesEditor=function(sessionId){
+    const session=data.sessions.find(item=>item.id===sessionId);if(!session)return '';
+    const linked=!!clientById(session.clientId);
+    return `<div class="notes-editor-wrap"><section class="notes-editor-card"><div class="notes-editor-head"><h2>Notas</h2><button class="notes-editor-close" id="closeNotesEditor">${svgIcon('close')}</button></div><div class="notes-editor-body"><label><strong>Sobre o atendimento</strong><textarea id="editAppointmentNote">${esc(session.appointmentNote||session.note||'')}</textarea></label><label class="${linked?'':'note-disabled'}"><strong>Sobre a cliente</strong><textarea id="editClientNote" ${linked?'':'disabled'}>${esc(session.clientNote||'')}</textarea>${linked?'':'<small>Vincule uma cliente para adicionar notas sobre ela.</small>'}</label></div><button class="notes-editor-save" id="saveNotesEditor">Salvar anotações</button></section></div>`;
+  };
+
+  function renderUzeActiveIcon(){
+    const sizes=Object.values(UI_CONFIG.activeIconSizes||{}),speeds=Object.values(UI_CONFIG.animationSpeeds||{});
+    const source=data.settings.activeTimerIconSource||'default';
+    const sourceLabels={default:'Padrão do aplicativo',file:'Arquivo no aparelho',svg:'SVG personalizado',remoteSvg:'Link SVG'};
+    const name=data.settings.activeTimerIconName||sourceLabels[source]||'Ícone personalizado';
+    return shell(`<header class="topbar simple section-tab-header appearance-header"><button class="appearance-back" id="closeUzeActiveIcon" aria-label="Voltar">${svgIcon('back')}</button><h1>Ícone ativo</h1><span></span></header><main class="settings-content uze-active-icon-settings">
+      <section class="settings-section"><h3 class="section-label">Ícone atual</h3><div class="settings-card uze-active-icon-summary"><span class="uze-active-icon-preview">${activeTimerIconMarkup()}</span><span><strong>${esc(name)}</strong><small>${esc(sourceLabels[source]||'Personalizado')}</small></span></div></section>
+      <section class="settings-section"><h3 class="section-label">Alterar ícone</h3><div class="settings-card"><label class="settings-row button-row" for="activeIconFile"><span>Escolher SVG ou PNG</span><input id="activeIconFile" class="sr-only" type="file" accept="image/svg+xml,image/png,.svg,.png"></label><button class="settings-row button-row" id="pasteSvgCode"><span>Colar código SVG</span></button><button class="settings-row button-row" id="pasteSvgUrl"><span>Usar URL de SVG</span></button>${source!=='default'?'<button class="settings-row button-row" id="restoreDefaultActiveIcon"><span>Restaurar padrão</span></button>':''}</div></section>
+      <section class="settings-section"><h3 class="section-label">Visual</h3><div class="settings-card"><div class="settings-row uze-option-row"><span>Tamanho</span><div class="animation-speed-options">${sizes.map(item=>`<button data-active-icon-size="${esc(item.id)}" class="${data.settings.activeTimerIconSize===item.id?'selected':''}">${esc(item.name)}</button>`).join('')}</div></div><button class="settings-row button-row" id="toggleActiveTimerAnimation"><span>Animar ícone do cronômetro ativo</span><span class="ios-switch ${data.settings.animateActiveTimerIcon?'on':''}"></span></button>${data.settings.animateActiveTimerIcon?`<div class="settings-row uze-option-row"><span>Velocidade</span><div class="animation-speed-options">${speeds.map(item=>`<button data-animation-speed="${esc(item.id)}" class="${data.settings.activeTimerAnimationSpeed===item.id?'selected':''}">${esc(item.name)}</button>`).join('')}</div></div>`:''}</div></section>
+    </main>`,'settings');
+  }
+
+  function renderUzeAppearance(){
+    const presets=UI_CONFIG.themePresets||[],custom=data.settings.colorTheme==='custom';
+    return shell(`<header class="topbar simple section-tab-header appearance-header"><button class="appearance-back" id="closeAppearanceSettings" aria-label="Voltar">${svgIcon('back')}</button><h1>Aparência</h1><span></span></header><main class="settings-content uze-appearance-settings">
+      <section class="settings-section"><h3 class="section-label">Cores</h3><div class="settings-card color-card"><div class="theme-presets horizontal-themes">${presets.map(preset=>`<button class="theme-preset ${data.settings.colorTheme===preset.id?'selected':''}" data-color-theme="${esc(preset.id)}"><span class="theme-dot" style="--theme-accent:${esc(preset.accent)};--theme-action:${esc(preset.action)}"></span><span>${esc(preset.name)}</span></button>`).join('')}<button class="theme-preset ${custom?'selected':''}" data-color-theme="custom"><span class="theme-dot custom-dot" style="--theme-accent:${esc(data.settings.accentColor||'#007AFF')};--theme-action:${esc(data.settings.accentColor||'#007AFF')}"></span><span>Personalizada</span></button></div>${custom?`<div class="custom-theme-row"><input id="accentCustom" type="color" value="${esc(data.settings.accentColor||'#007AFF')}"><span>${esc((data.settings.accentColor||'#007AFF').toUpperCase())}</span></div>`:''}</div></section>
+      <section class="settings-section"><div class="settings-card settings-navigation-card"><button class="settings-row button-row uze-navigation-row" id="openUzeActiveIcon"><span class="uze-navigation-copy"><strong>Ícone do cronômetro ativo</strong></span><span class="uze-chevron" aria-hidden="true">›</span></button></div></section>
+      <section class="settings-section"><div class="settings-card"><button class="settings-row button-row" id="toggleTotalColonBlink"><span>Piscar os dois pontos do tempo total</span><span class="ios-switch ${data.settings.blinkTotalColon?'on':''}"></span></button></div></section>
+      <section class="settings-section"><h3 class="section-label">Avançado</h3><div class="settings-card settings-navigation-card"><button class="settings-row button-row uze-navigation-row" id="openAdvancedSettings"><span class="uze-navigation-copy"><strong>Personalização avançada</strong></span><span class="uze-chevron" aria-hidden="true">›</span></button></div></section>
+    </main>`,'settings');
+  }
+
+  function backupStatus(){
+    const value=Number(data.settings.lastBackupExportAt||0);
+    if(!value||!Number.isFinite(value))return {label:'Nenhum backup registrado',attention:true};
+    const days=Math.max(0,Math.floor((now()-value)/86400000));
+    if(days===0)return {label:'Último backup: hoje',attention:false};
+    if(days===1)return {label:'Último backup: ontem',attention:false};
+    return {label:`Último backup há ${days} dias`,attention:days>=7};
+  }
+
+  function renderUzeSettingsMain(){
+    const theme=data.settings.theme||'system',visual=visualStyleModeV088(),release=String(window.APP_RELEASE||''),backup=backupStatus();
+    const themeOptions=[['light','Claro'],['system','Sistema'],['dark','Escuro']];
+    const visualOptions=[['classic','Otimizado',uzeIcons.optimized],['ultra','Ultra',uzeIcons.ultra]];
+    return shell(`<header class="topbar section-tab-header compact-tab-header settings-compact-header"><h1>Ajustes</h1></header><main class="settings-content settings-v090">
+      <section class="settings-section uze-mode-section"><h2 class="uze-settings-heading">Tema</h2><div class="uze-segment" data-selected="${esc(theme)}" data-options="3">${themeOptions.map(([id,label])=>`<button data-uze-theme="${id}" class="${theme===id?'selected':''}">${themeIcon(id)}<span>${label}</span></button>`).join('')}</div></section>
+      <section class="settings-section uze-mode-section"><h2 class="uze-settings-heading">Estilo visual</h2><div class="uze-segment uze-visual-segment" data-selected="${esc(visual)}" data-options="2">${visualOptions.map(([id,label,icon])=>`<button data-visual-style-mode="${id}" class="${visual===id?'selected':''}">${icon}<span>${label}</span></button>`).join('')}</div></section>
+      <section class="settings-section"><div class="settings-card settings-navigation-card uze-settings-navigation">
+        <button class="settings-row button-row uze-navigation-row" id="openClientsDirectory"><span class="settings-icon-label">${personIconMarkup()}<span><strong>Clientes</strong><small>Cadastrar e gerenciar clientes</small></span></span><span class="uze-chevron" aria-hidden="true">›</span></button>
+        <button class="settings-row button-row uze-navigation-row" id="openSoundSettings"><span class="settings-icon-label">${uzeIcons.note}<span><strong>Som do cronômetro</strong><small>${data.settings.timerSoundEnabled?'Ativado':'Desativado'}</small></span></span><span class="uze-chevron" aria-hidden="true">›</span></button>
+        <button class="settings-row button-row uze-navigation-row" id="openAppearanceSettings"><span class="settings-icon-label">${uzeIcons.appearance}<span><strong>Aparência</strong><small>Visual, ícones e detalhes</small></span></span><span class="uze-chevron" aria-hidden="true">›</span></button>
+      </div></section>
+      <section class="settings-section"><h3 class="section-label">Dados</h3><div class="data-backup-card"><button class="data-backup-row ${backup.attention?'is-attention':''}" id="exportJson"><span class="data-backup-row-icon">${backupShareIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Exportar backup</strong><span class="data-backup-row-subtitle">${esc(backup.label)}</span></span></button><label class="data-backup-row" for="importJsonFile"><span class="data-backup-row-icon">${backupImportIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Restaurar backup</strong><span class="data-backup-row-subtitle">Substitui os dados atuais pelo backup JSON</span></span><input id="importJsonFile" class="sr-only" type="file" accept="application/json,.json"></label></div></section>
+      <section class="settings-section"><h3 class="section-label">Outros formatos</h3><div class="settings-card"><button class="settings-row button-row" id="exportCsv"><span>Exportar CSV</span></button><button class="settings-row button-row" id="exportPdf"><span>Exportar PDF</span></button></div></section><p class="settings-version-v090">Versão ${esc(release)}</p>
+    </main>`,'settings');
+  }
+
+  function uzeClientRows(query=''){
+    const needle=normalize(query),clients=(data.settings.clients||[]).filter(client=>client&&!client.deletedAt&&(!needle||normalize(client.name).includes(needle))).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    if(!clients.length)return `<div class="empty">${needle?'Nenhuma cliente encontrada.':'Nenhuma cliente cadastrada.'}</div>`;
+    return `<div class="client-directory-card">${clients.map(client=>{const count=data.sessions.filter(session=>session.status==='saved'&&!session.deletedAt&&session.clientId===client.id).length;return `<button class="client-directory-row" data-open-client="${esc(client.id)}"><span><strong>${esc(client.name)}</strong>${client.whatsapp?`<small>${esc(client.whatsapp)}</small>`:''}</span><span>${count} atend.</span></button>`;}).join('')}</div>`;
+  }
+
+  function renderUzeClients(){
+    const query=String(ui.uzeClientQuery||'');
+    return shell(`<header class="topbar simple section-tab-header appearance-header"><button class="appearance-back" id="closeClientsDirectory" aria-label="Voltar">${svgIcon('back')}</button><h1>Clientes</h1><button class="uze-header-action" id="createUzeClient" aria-label="Cadastrar cliente">${svgIcon('plus')}</button></header><main class="settings-content clients-directory-screen"><label class="uze-client-search">${uzeIcons.search}<input id="uzeClientSearch" type="search" placeholder="Pesquisar clientes" value="${esc(query)}" autocomplete="off"></label><button class="uze-create-client" id="createUzeClientMain">${svgIcon('plus')}<span>Cadastrar nova cliente</span></button><div id="uzeClientRows">${uzeClientRows(query)}</div></main>`,'settings');
+  }
+
+  renderClientProfile=function(clientId){
+    const client=clientById(clientId);if(!client)return '';
+    const sessions=data.sessions.filter(session=>session.status==='saved'&&!session.deletedAt&&session.clientId===client.id).sort((a,b)=>recordDateMs(b)-recordDateMs(a));
+    const measured=sessions.filter(session=>!session.isNoMeasurement),average=measured.length?measured.reduce((sum,session)=>sum+sessionTotal(session,session.savedAt),0)/measured.length:0;
+    const notes=[...new Set(sessions.map(session=>String(session.clientNote||'').trim()).filter(Boolean))];
+    return `<div class="client-profile-wrap"><section class="client-profile-card uze-client-profile"><div class="client-profile-head"><button class="uze-profile-edit" data-edit-uze-client="${esc(client.id)}">${svgIcon('pencil')}<span>Editar</span></button><h2>${esc(client.name)}</h2><button class="client-profile-close" id="closeClientProfile">${svgIcon('close')}</button></div><div class="client-contact-strip"><span><small>WhatsApp</small><strong>${esc(client.whatsapp||'Não informado')}</strong></span><span><small>Atendimentos</small><strong>${sessions.length}</strong></span><span><small>Tempo médio</small><strong>${measured.length?fmtDuration(average):'—'}</strong></span></div><section class="client-profile-section"><h3>Notas sobre a cliente</h3>${notes.length?notes.map(note=>`<p>${esc(note)}</p>`).join(''):'<div class="muted small">Nenhuma anotação.</div>'}</section><section class="client-profile-section"><h3>Histórico</h3>${sessions.length?sessions.map(session=>`<button class="uze-client-history-row" data-open-client-record="${esc(session.id)}"><span>${esc(session.modelNameSnapshot||modelById(session.modelId)?.name||'Modelo')}</span><strong>${esc(fmtDate(recordDateMs(session)))}</strong></button>`).join(''):'<div class="muted small">Nenhum atendimento vinculado.</div>'}</section><button class="uze-delete-client" data-delete-uze-client="${esc(client.id)}">Excluir cliente</button></section></div>`;
+  };
+
+  renderAppearanceSettings=renderUzeAppearance;
+  renderSettings=function(){
+    const view=ui.settingsView||'main';
+    if(view==='appearance')return renderUzeAppearance();
+    if(view==='uzeActiveIcon')return renderUzeActiveIcon();
+    if(view==='advanced')return renderAdvancedSettings();
+    if(view==='sound')return renderTimerSoundSettings();
+    if(view==='clients')return renderUzeClients();
+    return renderUzeSettingsMain();
+  };
+
+  renderSessionMenu=function(){
+    const session=data.current,linked=!!clientById(session?.clientId);if(!session)return '';
+    return `<div class="modal-wrap"><section class="sheet details-sheet demo-details-sheet" role="dialog" aria-modal="true"><div class="sheet-head liquid-head"><button class="circle-button glass detail-close-button" id="closeModal" aria-label="Fechar">${svgIcon('close')}</button><h2>Detalhes</h2><span class="sheet-spacer"></span></div><div class="sheet-body"><h3 class="detail-section-label">Notas</h3><section class="sheet-card notes-detail-card"><div class="dual-notes"><div class="note-block"><label for="currentAppointmentNote">Sobre o atendimento</label><textarea id="currentAppointmentNote" rows="2">${esc(session.appointmentNote||session.note||'')}</textarea></div><div class="note-block ${linked?'':'note-disabled'}"><label for="currentClientNote">Sobre a cliente</label><textarea id="currentClientNote" rows="2" ${linked?'':'disabled'}>${esc(session.clientNote||'')}</textarea>${linked?'':'<small>Vincule uma cliente para adicionar notas sobre ela.</small>'}</div></div></section><h3 class="detail-section-label">Tamanho dos cronômetros</h3><section class="sheet-card timer-size-detail-card"><div class="detail-size-options animation-speed-options" role="group" aria-label="Tamanho dos cronômetros">${[['small','Pequeno'],['medium','Médio'],['large','Grande']].map(([id,label])=>`<button data-timer-size="${id}" class="${data.settings.timerSize===id?'selected':''}">${label}</button>`).join('')}</div></section><section class="uze-model-actions"><button class="detail-action" id="menuCustomize" aria-label="Reordenar cronômetros">${uzeIcons.reorder}<span>Reordenar</span></button><button class="detail-action" id="saveAsNewModel" aria-label="Salvar como novo modelo">${uzeIcons.duplicate}<span>Novo modelo</span></button></section></div></section></div>`;
+  };
+
+  renderTimerMarkerEditor=function(){
+    const target=markerTarget();if(!target)return '';
+    const marker=target.timer.marker||null,allowed=new Set(['lucide','iconoir','svg']),tab=allowed.has(ui.modal.markerTab)?ui.modal.markerTab:'lucide';
+    const lucideNames=Object.keys(V080_LUCIDE_MARKERS);let pane='';
+    if(tab==='lucide')pane=`<div class="marker-pane"><div class="marker-grid">${lucideNames.map(name=>`<button data-lucide-marker="${esc(name)}" aria-label="${esc(name)}">${lucideMarkerSvg(name)}</button>`).join('')}</div></div>`;
+    else if(tab==='iconoir')pane=`<div class="marker-pane"><input id="iconoirNameInput" placeholder="Nome do ícone, ex.: home-simple" value="${marker?.type==='iconoir'?esc(marker.value):''}"></div><div class="marker-editor-actions"><button class="primary" id="importIconoirMarker">Importar ícone</button></div>`;
+    else pane='<div class="marker-pane"><textarea id="markerSvgInput" placeholder="Cole o código SVG completo"></textarea></div><div class="marker-editor-actions"><button class="primary" id="applySvgMarker">Usar SVG</button></div>';
+    return `<div class="modal-wrap"><section class="sheet marker-editor-sheet"><div class="sheet-head"><h2>Ícone do cronômetro</h2><button class="chip" id="closeModal">Fechar</button></div>${visualMarkerMarkup(marker,'marker-preview')}<div class="marker-tabs">${[['lucide','Biblioteca'],['iconoir','Iconoir'],['svg','SVG']].map(([id,label])=>`<button data-marker-tab="${id}" class="${tab===id?'selected':''}">${label}</button>`).join('')}</div>${pane}<div class="marker-editor-actions"><button id="clearTimerMarker">Sem ícone</button></div></section></div>`;
+  };
+
+  renderEditModel=function(model){
+    const timers=model.timers.filter(timer=>!timer.removedAt).sort((a,b)=>a.order-b.order);
+    return `<div class="modal-wrap"><section class="sheet"><div class="sheet-head"><h2>${esc(model.name)}</h2><button class="chip" id="closeToModels">Concluir</button></div><div class="toolbar"><button id="renameModel">Renomear modelo</button><button id="addTemplate">＋ Cronômetro</button></div>${timers.length?timers.map((timer,index)=>`<div class="panel"><div class="row"><span class="model-timer-heading">${visualMarkerMarkup(timer.marker)}<strong>${esc(timer.name)}</strong></span><span class="toolbar"><button data-move-template="${timer.id}" data-dir="-1" ${index===0?'disabled':''}>↑</button><button data-move-template="${timer.id}" data-dir="1" ${index===timers.length-1?'disabled':''}>↓</button></span></div><div class="toolbar"><button data-edit-template="${timer.id}">Editar nome</button><button data-model-marker="${timer.id}">Ícone</button><button data-remove-template="${timer.id}" class="danger">Remover</button></div></div>`).join(''):'<div class="empty">Este modelo está vazio. Você pode mantê-lo assim ou adicionar cronômetros.</div>'}</section></div>`;
+  };
+
+  renderOrganize=function(){
+    const session=data.current;
+    return `<div class="modal-wrap"><section class="sheet organize-sheet"><div class="sheet-head"><h2>Reordenar cronômetros</h2><button class="chip" id="closeModal">Concluir</button></div><p class="organize-hint">Arraste pelo puxador. Toque no nome para renomear e no ícone para alterá-lo.</p><div class="organize-list" id="organizeList">${session.timers.sort((a,b)=>a.order-b.order).map(timer=>`<div class="organize-timer-card" data-organize-timer="${timer.id}">${organizeStateMarkup(session,timer)}<button class="organize-marker-button" data-current-marker="${timer.id}" aria-label="Ícone de ${esc(timer.name)}">${visualMarkerMarkup(timer.marker)}</button><button class="organize-name-button" data-rename-current="${timer.id}">${esc(timer.name)}</button><button class="organize-delete-button" data-remove-current="${timer.id}" aria-label="Remover ${esc(timer.name)}">${trashIconMarkup()}</button><button class="organize-drag-handle" data-reorder-handle="${timer.id}" aria-label="Arrastar ${esc(timer.name)}">≡</button></div>`).join('')}</div></section></div>`;
+  };
+
+  async function createUzeClient(){
+    const raw=await iosTextPrompt({title:'Cadastrar cliente',placeholder:'Nome da cliente'}),name=String(raw??'').trim();if(!name)return;
+    const existing=(data.settings.clients||[]).find(client=>!client.deletedAt&&normalize(client.name)===normalize(name));
+    const client=existing||await createClient(name,UZE_AREA);
+    if(!existing){const phone=await iosTextPrompt({title:'WhatsApp',message:'Opcional',placeholder:'(00) 00000-0000'});client.whatsapp=String(phone??'').trim();client.updatedAt=now();await persistSettings();}
+    ui.modal={type:'clientProfile',clientId:client.id};render();
+  }
+
+  async function editUzeClient(clientId){
+    const client=clientById(clientId);if(!client)return;
+    const rawName=await iosTextPrompt({title:'Editar cliente',value:client.name,placeholder:'Nome da cliente'}),name=String(rawName??'').trim();if(!name)return;
+    const rawPhone=await iosTextPrompt({title:'WhatsApp',message:'Opcional',value:client.whatsapp||'',placeholder:'(00) 00000-0000'});
+    client.name=name;client.whatsapp=String(rawPhone??client.whatsapp??'').trim();client.updatedAt=now();
+    for(const session of data.sessions){if(session.clientId===client.id){session.clientNameSnapshot=name;await put('sessions',session);}}
+    if(data.current?.clientId===client.id){data.current.clientNameSnapshot=name;await persistCurrent();}
+    await persistSettings();render();
+  }
+
+  async function deleteUzeClient(clientId){
+    const client=clientById(clientId);if(!client||!confirm(`Excluir “${client.name}” do cadastro? Os atendimentos e nomes registrados serão preservados.`))return;
+    client.deletedAt=now();client.updatedAt=now();await persistSettings();ui.modal=null;render();
+  }
+
   const baseRender=render;
   render=function(){
     const result=baseRender();
@@ -98,14 +266,24 @@
       if(!badge){badge=document.createElement('span');badge.id='uzeBetaVersionBadge';badge.className='app-version-badge uze-beta-version-badge';root.appendChild(badge);}
       badge.textContent=RELEASE;
     }
-    document.querySelectorAll('[data-uze-theme]').forEach(button=>button.onclick=async()=>{data.settings.theme=button.dataset.uzeTheme;await persistSettings();applyTheme();render();});
+    document.querySelectorAll('[data-uze-theme]').forEach(button=>button.onclick=async event=>{event.stopPropagation();const mode=button.dataset.uzeTheme,segment=button.closest('.uze-segment');segment.dataset.selected=mode;segment.querySelectorAll('button').forEach(item=>item.classList.toggle('selected',item===button));data.settings.theme=mode;applyTheme();await persistSettings();});
+    document.querySelectorAll('.uze-visual-segment [data-visual-style-mode]').forEach(button=>button.onclick=async event=>{event.stopPropagation();const mode=button.dataset.visualStyleMode==='ultra'?'ultra':'classic',segment=button.closest('.uze-segment');segment.dataset.selected=mode;segment.querySelectorAll('button').forEach(item=>item.classList.toggle('selected',item===button));data.settings.visualStyleMode=mode;applyVisualStyleV088(mode);await persistSettings();toast(mode==='ultra'?'Modo Ultra ativado':'Modo Otimizado ativado');});
     if(document.getElementById('openClientsDirectory'))document.getElementById('openClientsDirectory').onclick=()=>{ui.settingsView='clients';render();};
     if(document.getElementById('openUzeActiveIcon'))document.getElementById('openUzeActiveIcon').onclick=()=>{ui.settingsView='uzeActiveIcon';render();};
     if(document.getElementById('closeUzeActiveIcon'))document.getElementById('closeUzeActiveIcon').onclick=()=>{ui.settingsView='appearance';render();};
+    if(document.getElementById('closeClientsDirectory'))document.getElementById('closeClientsDirectory').onclick=()=>{ui.settingsView='main';render();};
+    ['createUzeClient','createUzeClientMain'].forEach(id=>{const button=document.getElementById(id);if(button)button.onclick=createUzeClient;});
+    const search=document.getElementById('uzeClientSearch');if(search)search.oninput=event=>{ui.uzeClientQuery=event.target.value;const rows=document.getElementById('uzeClientRows');if(rows)rows.innerHTML=uzeClientRows(ui.uzeClientQuery);document.querySelectorAll('[data-open-client]').forEach(button=>button.onclick=()=>{ui.modal={type:'clientProfile',clientId:button.dataset.openClient};render();});};
+    document.querySelectorAll('[data-edit-uze-client]').forEach(button=>button.onclick=()=>editUzeClient(button.dataset.editUzeClient));
+    document.querySelectorAll('[data-delete-uze-client]').forEach(button=>button.onclick=()=>deleteUzeClient(button.dataset.deleteUzeClient));
     return result;
   };
-  window.addEventListener('load',()=>setTimeout(async()=>{
-    await migrateUzeNativeClients();
-    render();
-  },0),{once:true});
+  async function reconcileWhenRuntimeIsReady(attempt=0){
+    if(typeof data!=='undefined'&&typeof db!=='undefined'&&db&&data?.settings&&Array.isArray(data.sessions)){
+      await migrateUzeNativeClients();render();return;
+    }
+    if(attempt<120)setTimeout(()=>reconcileWhenRuntimeIsReady(attempt+1),50);
+    else console.error('A reconciliação de clientes UZE não encontrou o runtime pronto.');
+  }
+  window.addEventListener('load',()=>reconcileWhenRuntimeIsReady(),{once:true});
 })();
