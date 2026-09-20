@@ -105,8 +105,8 @@
     sessions.forEach(s=>{const name=s.modelNameSnapshot||modelById(s.modelId)?.name||'Modelo';map.set(name,(map.get(name)||0)+1);});
     const rows=[...map.entries()].sort((a,b)=>b[1]-a[1]);
     if(!rows.length)return '<div class="analytics-empty-chart">Sem atendimentos no período.</div>';
-    const max=Math.max(...rows.map(x=>x[1]),1);
-    return `<div class="analytics-bars">${rows.map(([name,count])=>`<div class="analytics-bar-row"><div><span>${esc(name)}</span><strong>${count}</strong></div><div class="analytics-bar-track"><span style="width:${Math.max(5,count/max*100)}%"></span></div></div>`).join('')}</div>`;
+    const total=rows.reduce((sum,x)=>sum+x[1],0),colors=['#007AFF','#AF52DE','#34C759','#FF9500','#FF375F','#5AC8FA'];let angle=0;const slices=rows.map(([name,count],i)=>{const from=angle,part=count/total*360;angle+=part;return `${colors[i%colors.length]} ${from}deg ${angle}deg`;}).join(',');
+    return `<div class="analytics-donut-wrap"><div class="analytics-donut" style="background:conic-gradient(${slices})"><span>${total}</span></div><div class="analytics-donut-list">${rows.map(([name,count],i)=>`<div><i style="background:${colors[i%colors.length]}"></i><span>${esc(name)}</span><strong>${count}</strong></div>`).join('')}</div></div><div class="analytics-period-total"><small>Total no período</small><strong>${total} atendimento${total===1?'':'s'}</strong></div>`;
   }
 
   function bottleneckMarkup(sessions){
@@ -135,6 +135,15 @@
     const returning=ids.filter(id=>priorIds.has(id)).length,newClients=ids.length-returning,retention=ids.length?returning/ids.length*100:0,frequency=visits.length/ids.length;
     return `<div class="analytics-client-activity"><div class="analytics-retention-ring" style="--retention-angle:${(retention*3.6).toFixed(1)}deg"><div><strong>${retention.toFixed(0)}%</strong><span>recorrentes</span></div></div><div class="analytics-client-metrics"><div><span>Clientes recorrentes</span><strong>${returning}</strong></div><div><span>Clientes novas</span><strong>${newClients}</strong></div><div><span>Visitas por cliente</span><strong>${frequency.toFixed(1).replace('.',',')}</strong></div></div></div>`;
   }
+
+  function newClientsMarkup(bounds,days){
+    const clients=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&Number.isFinite(Number(c.createdAt))&&Number(c.createdAt)>=bounds.start&&Number(c.createdAt)<=bounds.end);
+    const prev=rangeBounds(days,1,bounds.end),previous=(data.settings.clients||[]).filter(c=>c&&!c.deletedAt&&Number.isFinite(Number(c.createdAt))&&Number(c.createdAt)>=prev.start&&Number(c.createdAt)<=prev.end).length;
+    const current=clients.length;let comparison='Sem base anterior para porcentagem',tone='neutral';if(previous){const pct=(current-previous)/previous*100;tone=pct>0?'positive':pct<0?'negative':'neutral';comparison=`${pct>0?'+':''}${pct.toFixed(1).replace('.',',')}% · comparado aos ${days} dias imediatamente anteriores`;}
+    return `<div class="analytics-new-clients trend-${tone}"><strong>${current}</strong><span>clientes novas</span><small>${comparison}</small></div>`;
+  }
+
+  function clientTimeExtremes(sessions,dir){const map=new Map();sessions.filter(s=>s.clientId).forEach(s=>{const x=map.get(s.clientId)||{id:s.clientId,sum:0,count:0};x.sum+=sessionTotal(s,s.savedAt);x.count++;map.set(s.clientId,x);});const rows=[...map.values()].map(x=>({...x,avg:x.sum/x.count,name:clientLabelForSession({clientId:x.id})})).sort((a,b)=>dir==='max'?b.avg-a.avg:a.avg-b.avg);if(!rows.length)return '<div class="analytics-empty-chart">Nenhuma cliente com atendimento medido neste período.</div>';const x=rows[0];return `<button class="analytics-client-extreme" data-open-client="${esc(x.id)}">${personIconMarkup()}<span>${esc(x.name)}</span><strong>${fmtDuration(x.avg)}</strong></button>`;}
 
   function analyticsCard(title,body,extra=''){
     return `<section class="analytics-card ${extra}"><h3>${title}</h3>${body}</section>`;
@@ -179,9 +188,11 @@
 
           ${analyticsCard(ui.analyticsModelId==='all'?'Tempos dos atendimentos':'Evolução por atendimento',lineChartMarkup(current),'analytics-chart-card')}
           ${analyticsCard('Etapas que mais mudaram',stepTrendMarkup(current,previous),'analytics-insight-card')}
-          ${analyticsCard('Onde seu tempo está indo',bottleneckMarkup(current),'analytics-chart-card')}
-          ${analyticsCard('Clientes no período',clientActivityMarkup(currentBounds,currentVisits),'analytics-client-card')}
-          ${ui.analyticsModelId==='all'?analyticsCard('Distribuição por modelo',modelBreakdownMarkup(current),'analytics-chart-card'):''}
+          ${ui.analyticsModelId==='all'?analyticsCard('Número de atendimentos',modelBreakdownMarkup(current),'analytics-chart-card'):''}
+          ${analyticsCard('Clientes novas',newClientsMarkup(currentBounds,days),'analytics-client-card')}
+          ${analyticsCard('Cliente que você mais leva tempo',clientTimeExtremes(current,'max'),'analytics-client-card')}
+          ${analyticsCard('Cliente que você leva menos tempo',clientTimeExtremes(current,'min'),'analytics-client-card')}
+          ${analyticsCard('Onde seu tempo está indo',`<p class="analytics-card-description">Mostra as etapas com maior tempo médio entre os atendimentos selecionados.</p>${bottleneckMarkup(current)}`,'analytics-chart-card')}
 
           <details class="analytics-global-card"><summary><span>${analyticsIcon('layers')}<strong>Estatísticas globais</strong></span><small>curiosidade · todos os períodos</small></summary><div class="analytics-global-grid"><div><span>Atendimentos medidos</span><strong>${all.length}</strong></div><div><span>Tempo médio global</span><strong>${all.length?fmtDuration(globalAvg):'—'}</strong></div></div></details>
         `}

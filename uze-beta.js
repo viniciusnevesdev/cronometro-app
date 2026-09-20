@@ -44,8 +44,9 @@
       if(!Object.prototype.hasOwnProperty.call(session,'clientId')){session.clientId=null;changed=true;}
       if(typeof session.clientNameSnapshot!=='string'){session.clientNameSnapshot='';changed=true;}
       // Preserva title: o vínculo é aditivo e reversível via backup.
-      if(!session.clientId&&clearlyLegacyClientName(session.title)){
-        const client=await findOrCreate(String(session.title).trim());
+      const legacyName=clearlyLegacyClientName(session.title)?String(session.title).trim():(clearlyLegacyClientName(session.clientNameSnapshot)?String(session.clientNameSnapshot).trim():'');
+      if(!session.clientId&&legacyName){
+        const client=await findOrCreate(legacyName);
         session.clientId=client.id;session.clientNameSnapshot=client.name;changed=true;
       }else if(session.clientId){
         const client=clients.find(c=>c?.id===session.clientId);
