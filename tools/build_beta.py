@@ -8,6 +8,7 @@ os metadados de versão do pacote Beta.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -27,7 +28,7 @@ if OUTPUT.exists():
 shutil.copytree(
     SOURCE,
     OUTPUT,
-    ignore=shutil.ignore_patterns(".git", ".github", "tools", "site", "beta", "*.pyc", "__pycache__"),
+    ignore=shutil.ignore_patterns(".git", ".github", "tools", "site", "beta", "AUDIT-*.md", "*.pyc", "__pycache__"),
 )
 
 def replace(path: Path, old: str, new: str) -> None:
@@ -40,6 +41,9 @@ def replace(path: Path, old: str, new: str) -> None:
 # ou escopo da estável. O SW tem scope /beta/ por ser servido desse diretório.
 replace(OUTPUT / "app.js", "const DB_NAME='cronometro_public_demo_v4';", f"const DB_NAME='{config['database']}';")
 replace(OUTPUT / "sw.js", "const CACHE='cronometro-public-presentation-0.8.10-8';", f"const CACHE='{config['cachePrefix']}{release}';")
+replace(OUTPUT / "sw.js", "const CACHE_PREFIX='cronometro-public-presentation-';", f"const CACHE_PREFIX='{config['cachePrefix']}';")
+replace(OUTPUT / "sw.js", "  './analytics.css',", "  './analytics.css',\n  './uze-beta.css',")
+replace(OUTPUT / "sw.js", "  './analytics-ui.js',", "  './analytics-ui.js',\n  './uze-beta.js',")
 
 index = OUTPUT / "index.html"
 html = index.read_text(encoding="utf-8")
@@ -68,5 +72,30 @@ checks = {
 for name, expected in checks.items():
     if expected not in (OUTPUT / name).read_text(encoding="utf-8"):
         raise SystemExit(f"Validação falhou: {name} não contém {expected}")
+
+# Contratos estruturais da variante. Valores técnicos como `classic` seguem
+# válidos; o que não pode reaparecer é a interface visual antiga.
+uze_js = (OUTPUT / "uze-beta.js").read_text(encoding="utf-8")
+if "indexOf(" in uze_js:
+    raise SystemExit("Validação falhou: a camada UZE não pode recortar HTML por indexOf")
+for forbidden in ("themeSelect", "Texto quando não houver cliente", ">Clássico<"):
+    if forbidden in uze_js:
+        raise SystemExit(f"Validação falhou: resíduo visual antigo na UZE Beta: {forbidden}")
+if uze_js.count('data-uze-theme="') != 1:
+    raise SystemExit("Validação falhou: seletor de tema UZE ausente ou duplicado")
+for required in ("Escolher cliente", "Ícone do cronômetro ativo", "Cadastrar nova cliente", "Modo Otimizado ativado"):
+    corpus = uze_js + (OUTPUT / "app.js").read_text(encoding="utf-8")
+    if required not in corpus:
+        raise SystemExit(f"Validação falhou: requisito UZE ausente: {required}")
+
+css = "\n".join((OUTPUT / name).read_text(encoding="utf-8") for name in ("styles.css", "presentation.css", "uze-beta.css"))
+for body in re.findall(r"\.history-card\s*\{([^}]*)\}", css, flags=re.S):
+    if "border-left" in body:
+        raise SystemExit("Validação falhou: faixa lateral legada voltou ao Histórico")
+
+index_text = (OUTPUT / "index.html").read_text(encoding="utf-8")
+for asset in ("analytics-ui.js", "analytics.css", "uze-beta.js", "uze-beta.css"):
+    if f'./{asset}' not in index_text:
+        raise SystemExit(f"Validação falhou: index não referencia {asset}")
 
 print(f"UZE Beta pronta: {release} -> {OUTPUT}")

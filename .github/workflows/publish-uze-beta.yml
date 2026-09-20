@@ -24,6 +24,10 @@ jobs:
         with:
           ref: uze-beta
           path: source
+      - name: Testar reconciliação de clientes
+        run: |
+          node source/tools/test_uze_reconciliation.js
+          node source/tools/test_analytics_ui.js
       - name: Montar pacote Beta
         run: python3 source/tools/build_beta.py source stable/beta
       - name: Validar isolamento e versão
@@ -31,8 +35,8 @@ jobs:
           test -s stable/beta/index.html
           test -s stable/beta/version.json
           test -s stable/beta/environment.json
-          grep -q '0.8.11-beta.3' stable/beta/index.html
-          grep -q '0.8.11-beta.3' stable/beta/version.json
+          grep -q '0.8.11-beta.4' stable/beta/index.html
+          grep -q '0.8.11-beta.4' stable/beta/version.json
           grep -q "cronometro_uze_beta_v1" stable/beta/app.js
           ! grep -q "const DB_NAME='cronometro_public_demo_v4';" stable/beta/app.js
           grep -q 'cronometro-uze-beta-' stable/beta/sw.js
