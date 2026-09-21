@@ -81,3 +81,5 @@
 @media (min-width:700px){
   .uze-mode-section,.uze-settings-navigation,.data-backup-card{max-width:680px;margin-left:auto;margin-right:auto}
 }
+
+.uze-demo-data-card{padding:13px 14px;display:grid;gap:10px}.uze-demo-data-copy{display:grid;gap:3px}.uze-demo-data-copy strong{font-size:14px}.uze-demo-data-copy small,.uze-demo-data-card p{margin:0;color:var(--secondary);font-size:11px;line-height:15px}.uze-demo-data-card button{min-height:40px;border:0;border-radius:13px;background:color-mix(in srgb,var(--accent) 12%,var(--card));color:var(--accent);font-weight:720;font-size:12.5px;padding:0 12px}
