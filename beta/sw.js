@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='cronometro-uze-beta-0.8.11-beta.4';
+const CACHE='cronometro-uze-beta-0.8.11-beta.5';
 const CACHE_PREFIX='cronometro-uze-beta-';
 const ASSETS=[
   './',
