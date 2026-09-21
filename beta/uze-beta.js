@@ -278,9 +278,42 @@
     document.querySelectorAll('[data-delete-uze-client]').forEach(button=>button.onclick=()=>deleteUzeClient(button.dataset.deleteUzeClient));
     return result;
   };
+  async function ensureUzeDemoDataset(){
+    const saved=data.sessions.filter(session=>session?.status==='saved'&&!session.deletedAt);
+    const hasDemo=saved.some(session=>/^demo-s\\d+$/.test(String(session.id||'')));
+    if(saved.length&&!hasDemo)return;
+    let payload;
+    try{const response=await fetch('./initial-data.json',{cache:'no-store'});if(!response.ok)return;payload=await response.json();}catch(error){console.warn('Não foi possível atualizar os dados fictícios UZE.',error);return;}
+    if(!payload?.demo?.enabled||!Array.isArray(payload.demo.sessions))return;
+    let settingsChanged=false;
+    const seedClients=Array.isArray(payload.settings?.clients)?payload.settings.clients:[];
+    if(!Array.isArray(data.settings.clients))data.settings.clients=[];
+    for(const seed of seedClients){
+      let current=data.settings.clients.find(client=>client?.id===seed.id);
+      if(!current){current=clone(seed);data.settings.clients.push(current);settingsChanged=true;}
+      else if(String(current.id||'').startsWith('client-demo-')){
+        for(const key of ['name','whatsapp','createdAt','updatedAt','areaId'])if(current[key]!==seed[key]){current[key]=seed[key];settingsChanged=true;}
+      }
+    }
+    const models=Array.isArray(payload.models)?payload.models:[];
+    for(const seed of models){
+      if(data.models.some(model=>model?.id===seed.id))continue;
+      const model=clone(seed);data.models.push(model);await put('models',model);
+    }
+    const existingIds=new Set(data.sessions.map(session=>String(session?.id||'')));
+    const baseNow=Date.now();
+    for(const spec of payload.demo.sessions){
+      if(existingIds.has(String(spec.id)))continue;
+      const session=typeof materializeDemoSession==='function'?materializeDemoSession(spec,models,data.settings.clients,baseNow):null;
+      if(!session)continue;
+      data.sessions.push(session);existingIds.add(String(session.id));await put('sessions',session);
+    }
+    if(settingsChanged)await persistSettings();
+  }
+
   async function reconcileWhenRuntimeIsReady(attempt=0){
     if(typeof data!=='undefined'&&typeof db!=='undefined'&&db&&data?.settings&&Array.isArray(data.sessions)){
-      await migrateUzeNativeClients();render();return;
+      await ensureUzeDemoDataset();await migrateUzeNativeClients();render();return;
     }
     if(attempt<120)setTimeout(()=>reconcileWhenRuntimeIsReady(attempt+1),50);
     else console.error('A reconciliação de clientes UZE não encontrou o runtime pronto.');
