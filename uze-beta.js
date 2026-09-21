@@ -162,6 +162,21 @@
     return {label:`Último backup há ${days} dias`,attention:days>=7};
   }
 
+  async function restoreUzeDemoDataset(){
+    if(!confirm('Substituir todos os dados atuais desta Beta pelos dados fictícios? Os registros atuais da Beta serão apagados.'))return;
+    try{
+      const response=await fetch('./initial-data.json',{cache:'no-store'});
+      if(!response.ok)throw new Error('Não foi possível carregar os dados fictícios.');
+      const payload=await response.json(),models=Array.isArray(payload.models)?payload.models.map((model,index)=>({...clone(model),sortOrder:Number.isFinite(model.sortOrder)?model.sortOrder:index})):[];
+      const settings=payload.settings&&typeof payload.settings==='object'?clone(payload.settings):{};
+      settings.areas=[{id:'principal',name:'Atendimentos',type:'clients'}];settings.activeAreaId='principal';
+      const clients=Array.isArray(settings.clients)?settings.clients:[],baseNow=Date.now();
+      const sessions=(payload.demo?.sessions||[]).map(spec=>materializeDemoSession(spec,models,clients,baseNow)).filter(Boolean);
+      await new Promise((resolve,reject)=>{const tr=db.transaction(['models','sessions','state'],'readwrite'),ms=tr.objectStore('models'),ss=tr.objectStore('sessions'),st=tr.objectStore('state');ms.clear();ss.clear();st.clear();models.forEach(model=>ms.put(model));sessions.forEach(session=>ss.put(session));st.put({key:'settings',value:settings});st.put({key:'current',value:null});st.put({key:FACTORY_SEED_STATE_KEY,value:Number(payload.factoryDataVersion)||APP_META.factoryDataVersion});tr.oncomplete=resolve;tr.onerror=()=>reject(tr.error);tr.onabort=()=>reject(tr.error||new Error('Restauração cancelada.'));});
+      location.reload();
+    }catch(error){console.error(error);alert('Não foi possível restaurar os dados fictícios desta Beta.');}
+  }
+
   function renderUzeSettingsMain(){
     const theme=data.settings.theme||'system',visual=visualStyleModeV088(),release=String(window.APP_RELEASE||''),backup=backupStatus();
     const themeOptions=[['light','Claro'],['system','Sistema'],['dark','Escuro']];
@@ -175,6 +190,7 @@
         <button class="settings-row button-row uze-navigation-row" id="openAppearanceSettings"><span class="settings-icon-label">${uzeIcons.appearance}<span><strong>Aparência</strong><small>Visual, ícones e detalhes</small></span></span><span class="uze-chevron" aria-hidden="true">›</span></button>
       </div></section>
       <section class="settings-section"><h3 class="section-label">Dados</h3><div class="data-backup-card"><button class="data-backup-row ${backup.attention?'is-attention':''}" id="exportJson"><span class="data-backup-row-icon">${backupShareIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Exportar backup</strong><span class="data-backup-row-subtitle">${esc(backup.label)}</span></span></button><label class="data-backup-row" for="importJsonFile"><span class="data-backup-row-icon">${backupImportIcon()}</span><span class="data-backup-row-copy"><strong class="data-backup-row-title">Restaurar backup</strong><span class="data-backup-row-subtitle">Substitui os dados atuais pelo backup JSON</span></span><input id="importJsonFile" class="sr-only" type="file" accept="application/json,.json"></label></div></section>
+      <section class="settings-section"><h3 class="section-label">Beta</h3><div class="settings-card uze-demo-data-card"><div class="uze-demo-data-copy"><strong>Dados fictícios</strong><small>50 atendimentos distribuídos em cerca de 6 meses. Ao restaurar, as datas são recalculadas a partir de hoje.</small></div><button type="button" id="restoreUzeDemoData">Restaurar / atualizar dados fictícios</button><p>Isso apaga e substitui somente os dados desta Beta.</p></div></section>
       <section class="settings-section"><h3 class="section-label">Outros formatos</h3><div class="settings-card"><button class="settings-row button-row" id="exportCsv"><span>Exportar CSV</span></button><button class="settings-row button-row" id="exportPdf"><span>Exportar PDF</span></button></div></section><p class="settings-version-v090">Versão ${esc(release)}</p>
     </main>`,'settings');
   }
@@ -268,6 +284,7 @@
     }
     document.querySelectorAll('[data-uze-theme]').forEach(button=>button.onclick=async event=>{event.stopPropagation();const mode=button.dataset.uzeTheme,segment=button.closest('.uze-segment');segment.dataset.selected=mode;segment.querySelectorAll('button').forEach(item=>item.classList.toggle('selected',item===button));data.settings.theme=mode;applyTheme();await persistSettings();});
     document.querySelectorAll('.uze-visual-segment [data-visual-style-mode]').forEach(button=>button.onclick=async event=>{event.stopPropagation();const mode=button.dataset.visualStyleMode==='ultra'?'ultra':'classic',segment=button.closest('.uze-segment');segment.dataset.selected=mode;segment.querySelectorAll('button').forEach(item=>item.classList.toggle('selected',item===button));data.settings.visualStyleMode=mode;applyVisualStyleV088(mode);await persistSettings();toast(mode==='ultra'?'Modo Ultra ativado':'Modo Otimizado ativado');});
+    if(document.getElementById('restoreUzeDemoData'))document.getElementById('restoreUzeDemoData').onclick=restoreUzeDemoDataset;
     if(document.getElementById('openClientsDirectory'))document.getElementById('openClientsDirectory').onclick=()=>{ui.settingsView='clients';render();};
     if(document.getElementById('openUzeActiveIcon'))document.getElementById('openUzeActiveIcon').onclick=()=>{ui.settingsView='uzeActiveIcon';render();};
     if(document.getElementById('closeUzeActiveIcon'))document.getElementById('closeUzeActiveIcon').onclick=()=>{ui.settingsView='appearance';render();};
