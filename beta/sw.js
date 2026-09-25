@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='cronometro-uze-beta-0.8.11-beta.5';
+const CACHE='cronometro-uze-beta-0.8.11-beta.6-beta-icon-20260925';
 const CACHE_PREFIX='cronometro-uze-beta-';
 const ASSETS=[
   './',
@@ -15,9 +15,9 @@ const ASSETS=[
   './presentation.js',
   './initial-data.json',
   './manifest.webmanifest',
-  './app-icon-192.png',
-  './app-icon-512.png',
-  './apple-touch-icon.png',
+  './app-icon-192.png?v=beta-icon-20260925',
+  './app-icon-512.png?v=beta-icon-20260925',
+  './apple-touch-icon.png?v=beta-icon-20260925',
   './launch.html',
   './recover.html',
   './safe.html',
